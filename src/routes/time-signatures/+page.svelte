@@ -18,7 +18,7 @@
 	// Layout  – multiple systems per page
 	const SYSTEM_WIDTH = 900; // usable width within an SVG system
 	const SYSTEM_MARGIN_TOP = 50; // vertical space between systems
-	const MIN_BAR_WIDTH = 120; // minimal width allowed for a single bar
+	const MIN_BAR_WIDTH = 180; // minimal width allowed for a single bar
 	const ROW_START_PADDING = 50; // initial padding value for the start of each row
 
 	// Notes
