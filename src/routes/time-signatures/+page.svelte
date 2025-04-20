@@ -19,6 +19,7 @@
 	const SYSTEM_WIDTH = 900; // usable width within an SVG system
 	const SYSTEM_MARGIN_TOP = 50; // vertical space between systems
 	const MIN_BAR_WIDTH = 120; // minimal width allowed for a single bar
+	const ROW_START_PADDING = 50; // initial padding value for the start of each row
 
 	// Notes
 	const NOTE_RADIUS = 10;
@@ -70,11 +71,34 @@
 		'9': 'U+E089' // timeSig9
 	};
 
+	// SMuFL codepoints for clefs
+	const CLEF_GLYPHS = {
+		treble: 'U+E050', // gClef
+		bass: 'U+E062', // fClef
+		alto: 'U+E05C', // cClef
+		tenor: 'U+E05C', // cClef (same as alto, positioned differently)
+		percussion: 'U+E069', // unpitchedPercussionClef
+		tab: 'U+E06D' // 6stringTabClef
+	};
+
 	// Time Signatures
 	const TIME_SIG_FONT_SIZE = 28;
 	const TIME_SIG_OFFSET_X = -20; // offset from bar line
-	const TIME_SIG_NUMERATOR_OFFSET_Y = 1; // offset from middle line
-	const TIME_SIG_DENOMINATOR_OFFSET_Y = 3; // offset from middle line
+	const TIME_SIG_NUMERATOR_OFFSET_Y = 2; // offset from middle line
+	const TIME_SIG_DENOMINATOR_OFFSET_Y = 2; // offset from middle line
+
+	// Clefs
+	const CLEF_FONT_SIZE = 40;
+	const CLEF_OFFSET_X = -90; // offset from left margin
+	// Y-position adjustments for different clefs (in staff spaces)
+	const CLEF_Y_ADJUSTMENTS = {
+		treble: 2, // G clef, 2nd line
+		bass: -2, // F clef, 4th line
+		alto: 0, // C clef, middle line
+		tenor: -1, // C clef, 4th line
+		percussion: 0, // centered
+		tab: 0 // centered
+	};
 
 	// Tolerances and other constants (formerly magic numbers)
 	const BARLINE_DETECTION_TOLERANCE_FACTOR = 0.3;
@@ -158,6 +182,9 @@
 	// Default to quarter note (crotchet)
 	let selectedNoteDuration: keyof typeof NOTE_DURATIONS = 'quarter';
 
+	// Default to treble clef
+	let selectedClef: keyof typeof CLEF_GLYPHS = 'treble';
+
 	let timeSignatureDigits = {}; // Will store digit glyphs from the SMuFL font
 	let noteCount = 0; // Total number of available note positions
 	let ghost: Note | null = null; // Ghost note for preview
@@ -168,14 +195,15 @@
 	let timeSignaturesNeedUpdate = true;
 	let notesNeedUpdate = true;
 	let beatsNeedUpdate = true;
+	let clefsNeedUpdate = true;
 
 	// Remove console.log outside development
 	$: if (browser && import.meta.env?.DEV) console.log(notes);
 
 	// Derived numbers that automatically update when dependencies change
-	$: barsPerSystem = Math.max(1, Math.floor(SYSTEM_WIDTH / MIN_BAR_WIDTH));
+	$: barsPerSystem = Math.max(1, Math.floor((SYSTEM_WIDTH - ROW_START_PADDING) / MIN_BAR_WIDTH));
 	$: systemCount = Math.ceil(barCount / barsPerSystem);
-	$: barWidth = (SYSTEM_WIDTH - MARGIN * 2) / barsPerSystem;
+	$: barWidth = (SYSTEM_WIDTH - MARGIN * 2 - ROW_START_PADDING) / barsPerSystem;
 
 	// Calculate total available slots based on time signature
 	$: noteCount = barCount * selectedTimeSignature.beatsPerBar;
@@ -188,13 +216,14 @@
 				barCountParam: number,
 				barsPerSystemParam: number,
 				barWidthParam: number,
-				beatsPerBarParam: number
+				beatsPerBarParam: number,
+				rowStartPaddingParam: number
 			) => {
 				const positions: number[] = [];
 
 				for (let barIdx = 0; barIdx < barCountParam; barIdx++) {
 					const barPositionInSystem = barIdx % barsPerSystemParam;
-					const xBarStart = MARGIN + barPositionInSystem * barWidthParam;
+					const xBarStart = MARGIN + rowStartPaddingParam + barPositionInSystem * barWidthParam;
 					const beatWidth = barWidthParam / beatsPerBarParam;
 
 					for (let beat = 0; beat < beatsPerBarParam; beat++) {
@@ -210,7 +239,8 @@
 			barCount,
 			barsPerSystem,
 			barWidth,
-			selectedTimeSignature.beatsPerBar
+			selectedTimeSignature.beatsPerBar,
+			ROW_START_PADDING
 		);
 	}
 
@@ -272,6 +302,9 @@
 
 		for (let sys = 0; sys < systemCount; sys++) {
 			const yOffset = sys * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+			// Calculate the actual width needed for this system based on bars
+			const barsInThisSystem = Math.min(barsPerSystem, barCount - sys * barsPerSystem);
+			const systemWidth = MARGIN + ROW_START_PADDING + barsInThisSystem * barWidth;
 
 			// Draw staff lines
 			for (let l = 0; l < STAFF_LINES; l++) {
@@ -279,7 +312,7 @@
 					.append('line')
 					.attr('class', 'staff')
 					.attr('x1', 0)
-					.attr('x2', SVG_WIDTH)
+					.attr('x2', systemWidth)
 					.attr('y1', MARGIN + yOffset + l * STAFF_SPACING)
 					.attr('y2', MARGIN + yOffset + l * STAFF_SPACING)
 					.attr('stroke', 'black')
@@ -304,9 +337,9 @@
 			const firstBarInSystem = sys * barsPerSystem;
 			const lastBarInSystem = Math.min(barCount, (sys + 1) * barsPerSystem) - 1;
 
-			// iterate through every barline, including first & last edge
-			for (let b = 0; b <= lastBarInSystem - firstBarInSystem + 1; b++) {
-				const xPos = MARGIN + b * barWidth;
+			// iterate through every barline, starting from second bar in system (skipping the first)
+			for (let b = 1; b <= lastBarInSystem - firstBarInSystem + 1; b++) {
+				const xPos = MARGIN + ROW_START_PADDING + b * barWidth;
 				// Draw the visible barline
 				svg
 					.append('line')
@@ -335,7 +368,7 @@
 			const systemIdx = Math.floor(barIdx / barsPerSystem);
 			const barInSystem = barIdx % barsPerSystem;
 			const yStart = MARGIN + systemIdx * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
-			const xStart = MARGIN + barInSystem * barWidth;
+			const xStart = MARGIN + ROW_START_PADDING + barInSystem * barWidth;
 
 			// Draw beat divisions based on time signature
 			const beatWidth = barWidth / beatsPerBar;
@@ -461,43 +494,75 @@
 
 		svg.selectAll('text.time-signature').remove();
 
-		// Only draw time signature at the beginning of the first system
-		// Draw numerator and denominator as separate text elements, stacked vertically
+		// Create time signatures at the beginning of each system
+		for (let sys = 0; sys < systemCount; sys++) {
+			const yOffset = sys * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+			const xPos = MARGIN + ROW_START_PADDING + TIME_SIG_OFFSET_X;
 
-		// Convert numbers to digit strings for rendering
-		const numStr = selectedTimeSignature.numerator.toString();
-		const denomStr = selectedTimeSignature.denominator.toString();
+			// Calculate middle line position (line 3)
+			const middleLinePos = MARGIN + yOffset + 2 * STAFF_SPACING;
 
-		// Calculate width for centering (multi-digit support)
-		const digitWidth = TIME_SIG_FONT_SIZE * DIGIT_WIDTH_FACTOR;
-		const numWidth = numStr.length * digitWidth;
-		const denomWidth = denomStr.length * digitWidth;
-
-		// Numerator (top number)
-		for (let i = 0; i < numStr.length; i++) {
+			// Add numerator
+			const numeratorStr = selectedTimeSignature.numerator.toString();
 			svg
 				.append('text')
 				.attr('class', 'time-signature smuFL')
-				.attr('x', MARGIN + TIME_SIG_OFFSET_X + i * digitWidth - numWidth / 2 + digitWidth / 2)
-				.attr('y', MARGIN + STAFF_SPACING * TIME_SIG_NUMERATOR_OFFSET_Y) // Position above the middle line
+				.attr('x', xPos)
+				.attr('y', middleLinePos - TIME_SIG_NUMERATOR_OFFSET_Y * (STAFF_SPACING / 2))
 				.attr('font-size', TIME_SIG_FONT_SIZE)
-				.attr('text-anchor', 'middle') // Center the text
-				.text(smuflChar(TIME_SIG_GLYPHS[numStr[i] as keyof typeof TIME_SIG_GLYPHS]));
-		}
+				.attr('text-anchor', 'middle')
+				.text(
+					numeratorStr
+						.split('')
+						.map((digit) => smuflChar(TIME_SIG_GLYPHS[digit as keyof typeof TIME_SIG_GLYPHS]))
+						.join('')
+				);
 
-		// Denominator (bottom number)
-		for (let i = 0; i < denomStr.length; i++) {
+			// Add denominator
+			const denominatorStr = selectedTimeSignature.denominator.toString();
 			svg
 				.append('text')
 				.attr('class', 'time-signature smuFL')
-				.attr('x', MARGIN + TIME_SIG_OFFSET_X + i * digitWidth - denomWidth / 2 + digitWidth / 2)
-				.attr('y', MARGIN + STAFF_SPACING * TIME_SIG_DENOMINATOR_OFFSET_Y) // Position below the middle line
+				.attr('x', xPos)
+				.attr('y', middleLinePos + TIME_SIG_DENOMINATOR_OFFSET_Y * (STAFF_SPACING / 2))
 				.attr('font-size', TIME_SIG_FONT_SIZE)
-				.attr('text-anchor', 'middle') // Center the text
-				.text(smuflChar(TIME_SIG_GLYPHS[denomStr[i] as keyof typeof TIME_SIG_GLYPHS]));
+				.attr('text-anchor', 'middle')
+				.text(
+					denominatorStr
+						.split('')
+						.map((digit) => smuflChar(TIME_SIG_GLYPHS[digit as keyof typeof TIME_SIG_GLYPHS]))
+						.join('')
+				);
 		}
 
 		timeSignaturesNeedUpdate = false;
+	};
+
+	const drawClefs = () => {
+		if (!svg) return;
+
+		svg.selectAll('text.clef').remove();
+
+		for (let sys = 0; sys < systemCount; sys++) {
+			const yOffset = sys * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+			// Calculate middle line position (line 3)
+			const middleLinePos = MARGIN + yOffset + 2 * STAFF_SPACING;
+
+			// Position adjustment based on clef type
+			const yAdjustment = (CLEF_Y_ADJUSTMENTS[selectedClef] * STAFF_SPACING) / 2;
+
+			// Add clef symbol
+			svg
+				.append('text')
+				.attr('class', 'clef smuFL')
+				.attr('x', MARGIN + CLEF_OFFSET_X + ROW_START_PADDING)
+				.attr('y', middleLinePos + yAdjustment)
+				.attr('font-size', CLEF_FONT_SIZE)
+				.attr('text-anchor', 'start')
+				.text(smuflChar(CLEF_GLYPHS[selectedClef]));
+		}
+
+		clefsNeedUpdate = false;
 	};
 
 	const updateGhost = (x: number, y: number) => {
@@ -570,7 +635,7 @@
 		for (let bar = firstBarInSystem; bar <= lastBarInSystem; bar++) {
 			// Position relative to current system
 			const relativeBar = bar % barsPerSystem;
-			const barlineX = MARGIN + relativeBar * barWidth;
+			const barlineX = MARGIN + ROW_START_PADDING + relativeBar * barWidth;
 			if (Math.abs(x - barlineX) < tolerance) {
 				return true;
 			}
@@ -639,8 +704,9 @@
 	const redraw = () => {
 		if (staffLinesNeedUpdate) drawStaffLines();
 		if (barLinesNeedUpdate) drawBarlines();
-		if (beatsNeedUpdate) drawBarBeats();
 		if (timeSignaturesNeedUpdate) drawTimeSignatures();
+		if (clefsNeedUpdate) drawClefs();
+		if (beatsNeedUpdate) drawBarBeats();
 		if (notesNeedUpdate) drawNotes();
 		attachListeners();
 	};
@@ -673,6 +739,7 @@
 			timeSignaturesNeedUpdate = true;
 			notesNeedUpdate = true;
 			beatsNeedUpdate = true;
+			clefsNeedUpdate = true;
 
 			redraw();
 		}
@@ -704,6 +771,7 @@
 			timeSignaturesNeedUpdate = true;
 			notesNeedUpdate = true;
 			beatsNeedUpdate = true;
+			clefsNeedUpdate = true;
 
 			redraw();
 		} catch (error) {
@@ -751,6 +819,26 @@
 					>{timeSig.numerator}/{timeSig.denominator} - {timeSig.description}</option
 				>
 			{/each}
+		</select>
+	</div>
+
+	<div style="margin-top: 1em;">
+		<label for="clef" style="margin-left:1em;">Clef: </label>
+		<select
+			id="clef"
+			bind:value={selectedClef}
+			on:change={() => {
+				clefsNeedUpdate = true;
+				redraw();
+			}}
+			aria-label="Select clef"
+		>
+			<option value="treble">Treble (G Clef)</option>
+			<option value="bass">Bass (F Clef)</option>
+			<option value="alto">Alto (C Clef)</option>
+			<option value="tenor">Tenor (C Clef)</option>
+			<option value="percussion">Percussion</option>
+			<option value="tab">Tab</option>
 		</select>
 	</div>
 
