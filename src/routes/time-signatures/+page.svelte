@@ -19,7 +19,7 @@
 	const SYSTEM_WIDTH = 900; // usable width within an SVG system
 	const SYSTEM_MARGIN_TOP = 50; // vertical space between systems
 	const MIN_BAR_WIDTH = 180; // minimal width allowed for a single bar
-	const ROW_START_PADDING = 50; // initial padding value for the start of each row
+	const ROW_START_PADDING = 150; // initial padding value for the start of each row
 
 	// Notes
 	const NOTE_RADIUS = 10;
@@ -81,15 +81,22 @@
 		tab: 'U+E06D' // 6stringTabClef
 	};
 
+	// SMuFL codepoints for accidentals
+	const ACCIDENTAL_GLYPHS = {
+		sharp: 'U+E262', // accidentalSharp
+		flat: 'U+E260', // accidentalFlat
+		natural: 'U+E261' // accidentalNatural
+	};
+
 	// Time Signatures
 	const TIME_SIG_FONT_SIZE = 28;
-	const TIME_SIG_OFFSET_X = -20; // offset from bar line
+	const TIME_SIG_OFFSET_X = -10; // offset from bar line
 	const TIME_SIG_NUMERATOR_OFFSET_Y = 2; // offset from middle line
 	const TIME_SIG_DENOMINATOR_OFFSET_Y = 2; // offset from middle line
 
 	// Clefs
 	const CLEF_FONT_SIZE = 40;
-	const CLEF_OFFSET_X = -90; // offset from left margin
+	const CLEF_OFFSET_X = -190; // offset from left margin
 	// Y-position adjustments for different clefs (in staff spaces)
 	const CLEF_Y_ADJUSTMENTS = {
 		treble: 2, // G clef, 2nd line
@@ -99,6 +106,107 @@
 		percussion: 0, // centered
 		tab: 0 // centered
 	};
+
+	// Key Signatures
+	const KEY_SIG_FONT_SIZE = 28;
+	const KEY_SIG_SPACING = 15; // horizontal spacing between accidentals
+	const KEY_SIG_OFFSET_X = -140; // offset from left margin
+
+	// Y-positions for key signature accidentals (staff position index for each note)
+	// These positions are relative to the middle line (0)
+	// Positive values move downward, negative values move upward
+	// Order follows the circle of fifths for both sharps (F, C, G, D, A, E, B) and flats (B, E, A, D, G, C, F)
+	// const SHARP_POSITIONS = {
+	// 	treble: [-0.5, -2, 0.5, -1, -2.5, 0, -1.5], // F#, C#, G#, D#, A#, E#, B#
+	// 	bass: [1.5, 0, 2, 0.5, -1, 1, -0.5], // F#, C#, G#, D#, A#, E#, B#
+	// 	alto: [0.5, -1, 1, -0.5, -2, 0, -1], // F#, C#, G#, D#, A#, E#, B#
+	// 	tenor: [1.5, 0, 2, 0.5, -1, 1, -0.5], // F#, C#, G#, D#, A#, E#, B#
+	// 	percussion: [0.5, -1, 1, -0.5, -2, 0, -1],
+	// 	tab: [0.5, -1, 1, -0.5, -2, 0, -1]
+	// };
+
+	// const FLAT_POSITIONS = {
+	// 	treble: [0, -1.5, 0.5, -1, 1, -0.5, 1.5], // Bb, Eb, Ab, Db, Gb, Cb, Fb
+	// 	bass: [2, 0.5, 3, 1.5, 4, 2.5, 5], // Bb, Eb, Ab, Db, Gb, Cb, Fb
+	// 	alto: [1, -0.5, 1.5, 0, 2, 0.5, 2.5], // Bb, Eb, Ab, Db, Gb, Cb, Fb
+	// 	tenor: [2, 0.5, 2.5, 1, 3, 1.5, 3.5], // Bb, Eb, Ab, Db, Gb, Cb, Fb
+	// 	percussion: [1, -0.5, 1.5, 0, 2, 0.5, 2.5],
+	// 	tab: [1, -0.5, 1.5, 0, 2, 0.5, 2.5]
+	// }
+	// ;
+
+	const SHARP_POSITIONS = {
+		treble: [-4, -1, -5, -2, 1, -3, 0], // F#, C#, G#, D#, A#, E#, B#
+		bass: [-2, 1, -3, 0, 3, -1, 2], // C#, G#, D#, A#, E#, B#, F#
+		alto: [-3, 0, -4, -1, 2, -2, 1], // F#, C#, G#, D#, A#, E#, B#
+		tenor: [2, -2, 1, -3, 0, -4, -1] // F#, C#, G#, D#, A#, E#, B#
+	};
+
+	const FLAT_POSITIONS = {
+		treble: [0, -3, 1, -4, -1, -5, -2], // Bb, Eb, Ab, Db, Gb, Cb, Fb
+		bass: [3, 0, 4, 1, 5, 2, -1], // Bb, Eb, Ab, Db, Gb, Cb, Fb
+		alto: [2, -1, 3, 0, 4, 1, 5], // Bb, Eb, Ab, Db, Gb, Cb, Fb
+		tenor: [-1, -4, 0, -3, 1, -2, 2] // Bb, Eb, Ab, Db, Gb, Cb, Fb
+	};
+
+	// Standard key signatures
+	const KEY_SIGNATURES = [
+		{ name: 'C major / A minor', sharps: 0, flats: 0, accidentals: [] },
+		{ name: 'G major / E minor', sharps: 1, flats: 0, accidentals: ['sharp'] },
+		{ name: 'D major / B minor', sharps: 2, flats: 0, accidentals: ['sharp', 'sharp'] },
+		{ name: 'A major / F# minor', sharps: 3, flats: 0, accidentals: ['sharp', 'sharp', 'sharp'] },
+		{
+			name: 'E major / C# minor',
+			sharps: 4,
+			flats: 0,
+			accidentals: ['sharp', 'sharp', 'sharp', 'sharp']
+		},
+		{
+			name: 'B major / G# minor',
+			sharps: 5,
+			flats: 0,
+			accidentals: ['sharp', 'sharp', 'sharp', 'sharp', 'sharp']
+		},
+		{
+			name: 'F# major / D# minor',
+			sharps: 6,
+			flats: 0,
+			accidentals: ['sharp', 'sharp', 'sharp', 'sharp', 'sharp', 'sharp']
+		},
+		{
+			name: 'C# major / A# minor',
+			sharps: 7,
+			flats: 0,
+			accidentals: ['sharp', 'sharp', 'sharp', 'sharp', 'sharp', 'sharp', 'sharp']
+		},
+		{ name: 'F major / D minor', sharps: 0, flats: 1, accidentals: ['flat'] },
+		{ name: 'Bb major / G minor', sharps: 0, flats: 2, accidentals: ['flat', 'flat'] },
+		{ name: 'Eb major / C minor', sharps: 0, flats: 3, accidentals: ['flat', 'flat', 'flat'] },
+		{
+			name: 'Ab major / F minor',
+			sharps: 0,
+			flats: 4,
+			accidentals: ['flat', 'flat', 'flat', 'flat']
+		},
+		{
+			name: 'Db major / Bb minor',
+			sharps: 0,
+			flats: 5,
+			accidentals: ['flat', 'flat', 'flat', 'flat', 'flat']
+		},
+		{
+			name: 'Gb major / Eb minor',
+			sharps: 0,
+			flats: 6,
+			accidentals: ['flat', 'flat', 'flat', 'flat', 'flat', 'flat']
+		},
+		{
+			name: 'Cb major / Ab minor',
+			sharps: 0,
+			flats: 7,
+			accidentals: ['flat', 'flat', 'flat', 'flat', 'flat', 'flat', 'flat']
+		}
+	];
 
 	// Tolerances and other constants (formerly magic numbers)
 	const BARLINE_DETECTION_TOLERANCE_FACTOR = 0.3;
@@ -183,7 +291,10 @@
 	let selectedNoteDuration: keyof typeof NOTE_DURATIONS = 'quarter';
 
 	// Default to treble clef
-	let selectedClef: keyof typeof CLEF_GLYPHS = 'treble';
+	let selectedClef: keyof typeof CLEF_GLYPHS = 'tenor';
+
+	// Default to C major / A minor (no accidentals)
+	let selectedKeySignature = KEY_SIGNATURES[7];
 
 	let timeSignatureDigits = {}; // Will store digit glyphs from the SMuFL font
 	let noteCount = 0; // Total number of available note positions
@@ -196,6 +307,7 @@
 	let notesNeedUpdate = true;
 	let beatsNeedUpdate = true;
 	let clefsNeedUpdate = true;
+	let keySignaturesNeedUpdate = true;
 
 	// Remove console.log outside development
 	$: if (browser && import.meta.env?.DEV) console.log(notes);
@@ -565,6 +677,62 @@
 		clefsNeedUpdate = false;
 	};
 
+	const drawKeySignatures = () => {
+		if (!svg) return;
+
+		svg.selectAll('text.key-signature').remove();
+
+		for (let sys = 0; sys < systemCount; sys++) {
+			const yOffset = sys * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+
+			// Calculate middle line position (line 3)
+			const middleLinePos = MARGIN + yOffset + 2 * STAFF_SPACING;
+
+			// Position after clef but before time signature
+			let xPos = MARGIN + ROW_START_PADDING + KEY_SIG_OFFSET_X;
+
+			const clefType = selectedClef;
+
+			// Draw sharps
+			if (selectedKeySignature.sharps > 0) {
+				for (let i = 0; i < selectedKeySignature.sharps; i++) {
+					// Calculate y position based on which accidental (follows circle of fifths order)
+					const yAdjust = SHARP_POSITIONS[clefType][i] * (STAFF_SPACING / 2);
+
+					svg
+						.append('text')
+						.attr('class', 'key-signature smuFL')
+						.attr('x', xPos)
+						.attr('y', middleLinePos + yAdjust)
+						.attr('font-size', KEY_SIG_FONT_SIZE)
+						.text(smuflChar(ACCIDENTAL_GLYPHS.sharp));
+
+					xPos += KEY_SIG_SPACING; // Move to next accidental position
+				}
+			}
+
+			// Draw flats
+			if (selectedKeySignature.flats > 0) {
+				for (let i = 0; i < selectedKeySignature.flats; i++) {
+					// Calculate y position based on which accidental (follows circle of fifths order)
+					const yAdjust = FLAT_POSITIONS[clefType][i] * (STAFF_SPACING / 2);
+
+					svg
+						.append('text')
+						.attr('class', 'key-signature smuFL')
+						.attr('x', xPos)
+						.attr('y', middleLinePos + yAdjust)
+						.attr('font-size', KEY_SIG_FONT_SIZE)
+						.text(smuflChar(ACCIDENTAL_GLYPHS.flat));
+
+					xPos += KEY_SIG_SPACING; // Move to next accidental position
+				}
+			}
+		}
+
+		keySignaturesNeedUpdate = false;
+	};
+
 	const updateGhost = (x: number, y: number) => {
 		if (!svg) return;
 
@@ -704,8 +872,9 @@
 	const redraw = () => {
 		if (staffLinesNeedUpdate) drawStaffLines();
 		if (barLinesNeedUpdate) drawBarlines();
-		if (timeSignaturesNeedUpdate) drawTimeSignatures();
 		if (clefsNeedUpdate) drawClefs();
+		if (keySignaturesNeedUpdate) drawKeySignatures();
+		if (timeSignaturesNeedUpdate) drawTimeSignatures();
 		if (beatsNeedUpdate) drawBarBeats();
 		if (notesNeedUpdate) drawNotes();
 		attachListeners();
@@ -740,6 +909,7 @@
 			notesNeedUpdate = true;
 			beatsNeedUpdate = true;
 			clefsNeedUpdate = true;
+			keySignaturesNeedUpdate = true;
 
 			redraw();
 		}
@@ -772,6 +942,7 @@
 			notesNeedUpdate = true;
 			beatsNeedUpdate = true;
 			clefsNeedUpdate = true;
+			keySignaturesNeedUpdate = true;
 
 			redraw();
 		} catch (error) {
@@ -829,6 +1000,7 @@
 			bind:value={selectedClef}
 			on:change={() => {
 				clefsNeedUpdate = true;
+				keySignaturesNeedUpdate = true;
 				redraw();
 			}}
 			aria-label="Select clef"
@@ -837,8 +1009,25 @@
 			<option value="bass">Bass (F Clef)</option>
 			<option value="alto">Alto (C Clef)</option>
 			<option value="tenor">Tenor (C Clef)</option>
-			<option value="percussion">Percussion</option>
-			<option value="tab">Tab</option>
+			<!-- <option value="percussion">Percussion</option>
+			<option value="tab">Tab</option> -->
+		</select>
+	</div>
+
+	<div style="margin-top: 1em;">
+		<label for="keySignature" style="margin-left:1em;">Key Signature: </label>
+		<select
+			id="keySignature"
+			bind:value={selectedKeySignature}
+			on:change={() => {
+				keySignaturesNeedUpdate = true;
+				redraw();
+			}}
+			aria-label="Select key signature"
+		>
+			{#each KEY_SIGNATURES as keySig}
+				<option value={keySig}>{keySig.name}</option>
+			{/each}
 		</select>
 	</div>
 
