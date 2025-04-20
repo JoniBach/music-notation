@@ -291,10 +291,10 @@
 	let selectedNoteDuration: keyof typeof NOTE_DURATIONS = 'quarter';
 
 	// Default to treble clef
-	let selectedClef: keyof typeof CLEF_GLYPHS = 'tenor';
+	let selectedClef: keyof typeof CLEF_GLYPHS = 'treble';
 
 	// Default to C major / A minor (no accidentals)
-	let selectedKeySignature = KEY_SIGNATURES[7];
+	let selectedKeySignature = KEY_SIGNATURES[0];
 
 	let timeSignatureDigits = {}; // Will store digit glyphs from the SMuFL font
 	let noteCount = 0; // Total number of available note positions
