@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import * as d3 from 'd3';
 	import { browser } from '$app/environment';
+	import * as Tone from 'tone';
 
 	/*********************
 	 *  Configuration   *
@@ -28,7 +29,7 @@
 	const STEM_WIDTH = 20; // Width of note stems
 
 	// Note durations in beats (relative to a quarter note = 1.0)
-	const NOTE_DURATIONS = {
+	const NOTE_DURATIONS: Record<string, number> = {
 		whole: 4.0, // Semibreve
 		half: 2.0, // Minim
 		quarter: 1.0, // Crotchet
@@ -37,7 +38,7 @@
 	};
 
 	// SMuFL codepoints for different note types (will be populated in onMount)
-	const NOTE_GLYPHS = {
+	const NOTE_GLYPHS: Record<string, string> = {
 		whole: 'U+E1D2', // Semibreve (noteheadWhole)
 		half: 'U+E1D3', // Minim (noteheadHalf)
 		quarter: 'U+E1D5', // Crotchet (noteheadBlack)
@@ -46,7 +47,7 @@
 	};
 
 	// SMuFL codepoints for flags
-	const FLAG_GLYPHS = {
+	const FLAG_GLYPHS: Record<string, Record<string, string>> = {
 		eighth: {
 			up: 'U+E240', // Flag8thUp
 			down: 'U+E241' // Flag8thDown
@@ -58,7 +59,7 @@
 	};
 
 	// SMuFL codepoints for time signature digits
-	const TIME_SIG_GLYPHS = {
+	const TIME_SIG_GLYPHS: Record<string, string> = {
 		'0': 'U+E080', // timeSig0
 		'1': 'U+E081', // timeSig1
 		'2': 'U+E082', // timeSig2
@@ -72,7 +73,7 @@
 	};
 
 	// SMuFL codepoints for clefs
-	const CLEF_GLYPHS = {
+	const CLEF_GLYPHS: Record<string, string> = {
 		treble: 'U+E050', // gClef
 		bass: 'U+E062', // fClef
 		alto: 'U+E05C', // cClef
@@ -82,7 +83,7 @@
 	};
 
 	// SMuFL codepoints for accidentals
-	const ACCIDENTAL_GLYPHS = {
+	const ACCIDENTAL_GLYPHS: Record<string, string> = {
 		sharp: 'U+E262', // accidentalSharp
 		flat: 'U+E260', // accidentalFlat
 		natural: 'U+E261' // accidentalNatural
@@ -98,7 +99,7 @@
 	const CLEF_FONT_SIZE = 40;
 	const CLEF_OFFSET_X = -190; // offset from left margin
 	// Y-position adjustments for different clefs (in staff spaces)
-	const CLEF_Y_ADJUSTMENTS = {
+	const CLEF_Y_ADJUSTMENTS: Record<string, number> = {
 		treble: 2, // G clef, 2nd line
 		bass: -2, // F clef, 4th line
 		alto: 0, // C clef, middle line
@@ -116,33 +117,14 @@
 	// These positions are relative to the middle line (0)
 	// Positive values move downward, negative values move upward
 	// Order follows the circle of fifths for both sharps (F, C, G, D, A, E, B) and flats (B, E, A, D, G, C, F)
-	// const SHARP_POSITIONS = {
-	// 	treble: [-0.5, -2, 0.5, -1, -2.5, 0, -1.5], // F#, C#, G#, D#, A#, E#, B#
-	// 	bass: [1.5, 0, 2, 0.5, -1, 1, -0.5], // F#, C#, G#, D#, A#, E#, B#
-	// 	alto: [0.5, -1, 1, -0.5, -2, 0, -1], // F#, C#, G#, D#, A#, E#, B#
-	// 	tenor: [1.5, 0, 2, 0.5, -1, 1, -0.5], // F#, C#, G#, D#, A#, E#, B#
-	// 	percussion: [0.5, -1, 1, -0.5, -2, 0, -1],
-	// 	tab: [0.5, -1, 1, -0.5, -2, 0, -1]
-	// };
-
-	// const FLAT_POSITIONS = {
-	// 	treble: [0, -1.5, 0.5, -1, 1, -0.5, 1.5], // Bb, Eb, Ab, Db, Gb, Cb, Fb
-	// 	bass: [2, 0.5, 3, 1.5, 4, 2.5, 5], // Bb, Eb, Ab, Db, Gb, Cb, Fb
-	// 	alto: [1, -0.5, 1.5, 0, 2, 0.5, 2.5], // Bb, Eb, Ab, Db, Gb, Cb, Fb
-	// 	tenor: [2, 0.5, 2.5, 1, 3, 1.5, 3.5], // Bb, Eb, Ab, Db, Gb, Cb, Fb
-	// 	percussion: [1, -0.5, 1.5, 0, 2, 0.5, 2.5],
-	// 	tab: [1, -0.5, 1.5, 0, 2, 0.5, 2.5]
-	// }
-	// ;
-
-	const SHARP_POSITIONS = {
+	const SHARP_POSITIONS: Record<string, number[]> = {
 		treble: [-4, -1, -5, -2, 1, -3, 0], // F#, C#, G#, D#, A#, E#, B#
 		bass: [-2, 1, -3, 0, 3, -1, 2], // C#, G#, D#, A#, E#, B#, F#
 		alto: [-3, 0, -4, -1, 2, -2, 1], // F#, C#, G#, D#, A#, E#, B#
 		tenor: [2, -2, 1, -3, 0, -4, -1] // F#, C#, G#, D#, A#, E#, B#
 	};
 
-	const FLAT_POSITIONS = {
+	const FLAT_POSITIONS: Record<string, number[]> = {
 		treble: [0, -3, 1, -4, -1, -5, -2], // Bb, Eb, Ab, Db, Gb, Cb, Fb
 		bass: [3, 0, 4, 1, 5, 2, -1], // Bb, Eb, Ab, Db, Gb, Cb, Fb
 		alto: [2, -1, 3, 0, 4, 1, 5], // Bb, Eb, Ab, Db, Gb, Cb, Fb
@@ -150,7 +132,12 @@
 	};
 
 	// Standard key signatures
-	const KEY_SIGNATURES = [
+	const KEY_SIGNATURES: {
+		name: string;
+		sharps: number;
+		flats: number;
+		accidentals: string[];
+	}[] = [
 		{ name: 'C major / A minor', sharps: 0, flats: 0, accidentals: [] },
 		{ name: 'G major / E minor', sharps: 1, flats: 0, accidentals: ['sharp'] },
 		{ name: 'D major / B minor', sharps: 2, flats: 0, accidentals: ['sharp', 'sharp'] },
@@ -246,15 +233,137 @@
 
 	// Note name mappings by clef and staff position
 	// Each clef has a different reference for what each staff position means
-	const NOTE_NAMES = {
-		treble: ['E5', 'D5', 'C5', 'B4', 'A4', 'G4', 'F4', 'E4', 'D4', 'C4', 'B3', 'A3', 'G3', 'F3', 'E3', 'D3', 'C3', 'B2', 'A2'],
-		bass: ['G3', 'F3', 'E3', 'D3', 'C3', 'B2', 'A2', 'G2', 'F2', 'E2', 'D2', 'C2', 'B1', 'A1', 'G1', 'F1', 'E1', 'D1', 'C1'],
-		alto: ['A4', 'G4', 'F4', 'E4', 'D4', 'C4', 'B3', 'A3', 'G3', 'F3', 'E3', 'D3', 'C3', 'B2', 'A2', 'G2', 'F2', 'E2', 'D2'],
-		tenor: ['F4', 'E4', 'D4', 'C4', 'B3', 'A3', 'G3', 'F3', 'E3', 'D3', 'C3', 'B2', 'A2', 'G2', 'F2', 'E2', 'D2', 'C2', 'B1']
+	const NOTE_NAMES: Record<string, string[]> = {
+		treble: [
+			'E5',
+			'D5',
+			'C5',
+			'B4',
+			'A4',
+			'G4',
+			'F4',
+			'E4',
+			'D4',
+			'C4',
+			'B3',
+			'A3',
+			'G3',
+			'F3',
+			'E3',
+			'D3',
+			'C3',
+			'B2',
+			'A2'
+		],
+		bass: [
+			'G3',
+			'F3',
+			'E3',
+			'D3',
+			'C3',
+			'B2',
+			'A2',
+			'G2',
+			'F2',
+			'E2',
+			'D2',
+			'C2',
+			'B1',
+			'A1',
+			'G1',
+			'F1',
+			'E1',
+			'D1',
+			'C1'
+		],
+		alto: [
+			'A4',
+			'G4',
+			'F4',
+			'E4',
+			'D4',
+			'C4',
+			'B3',
+			'A3',
+			'G3',
+			'F3',
+			'E3',
+			'D3',
+			'C3',
+			'B2',
+			'A2',
+			'G2',
+			'F2',
+			'E2',
+			'D2'
+		],
+		tenor: [
+			'F4',
+			'E4',
+			'D4',
+			'C4',
+			'B3',
+			'A3',
+			'G3',
+			'F3',
+			'E3',
+			'D3',
+			'C3',
+			'B2',
+			'A2',
+			'G2',
+			'F2',
+			'E2',
+			'D2',
+			'C2',
+			'B1'
+		],
+		percussion: [
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4',
+			'C4'
+		],
+		tab: [
+			'E4',
+			'A4',
+			'D4',
+			'G4',
+			'B4',
+			'E5',
+			'E4',
+			'A4',
+			'D4',
+			'G4',
+			'B4',
+			'E5',
+			'E4',
+			'A4',
+			'D4',
+			'G4',
+			'B4',
+			'E5',
+			'E4'
+		]
 	};
 
 	// Duration name mappings
-	const DURATION_NAMES = {
+	const DURATION_NAMES: Record<string, string> = {
 		whole: 'whole',
 		half: 'half',
 		quarter: 'quarter',
@@ -336,6 +445,10 @@
 	let playbackCursor: any = null; // Using any to avoid d3 type issues
 	let currentlyPlayingNote: number = -1; // Index of the note currently being highlighted during playback
 	let noteLabel: any = null; // Label for displaying note name and duration
+
+	// Sound variables
+	let synth: Tone.PolySynth; // Synth for playing notes
+	let soundInitialized = false; // Flag to track if Web Audio context is initialized
 
 	// Remove console.log outside development
 	$: if (browser && import.meta.env?.DEV) console.log(notes);
@@ -838,9 +951,7 @@
 
 		// Update the label position
 		if (noteLabel) {
-			noteLabel
-				.attr('x', x)
-				.attr('y', yStart - STAFF_SPACING * 1.5);
+			noteLabel.attr('x', x).attr('y', yStart - STAFF_SPACING * 1.5);
 
 			// Update the note label if there's a note at this position
 			updateNoteLabel();
@@ -849,6 +960,9 @@
 
 	const startPlayback = () => {
 		if (isPlaying) return;
+
+		// Initialize audio if not already done
+		initializeSynth();
 
 		isPlaying = true;
 		lastTimestamp = null;
@@ -1081,7 +1195,7 @@
 	};
 
 	onMount(async () => {
-		if (!browser) return undefined;
+		if (!browser) return;
 
 		try {
 			// Initialize the SVG first so we can show something even if font metadata fails
@@ -1124,11 +1238,8 @@
 		}
 
 		// Cleanup function that explicitly returns void
-		return () => {
-			if (isPlaying) {
-				stopPlayback();
-			}
-		};
+		return () =>
+			void (isPlaying ? stopPlayback() : null, soundInitialized && synth ? synth.dispose() : null);
 	});
 
 	const updateGhost = (x: number, y: number) => {
@@ -1187,7 +1298,7 @@
 	};
 
 	// Helper to determine the note name based on staff position and clef
-	const getNoteName = (note: Note): string => {
+	const getNoteLetter = (note: Note): string => {
 		// Find the index of the note position in the validYPositions array
 		const yIndex = validYPositions.indexOf(note.y);
 		if (yIndex === -1) return 'Unknown';
@@ -1220,28 +1331,33 @@
 		const noteName = noteNames[relativePosition] || 'Unknown';
 
 		// Extract just the note letter (without octave)
-		const noteLetterOnly = noteName.charAt(0);
-
-		return noteLetterOnly;
+		return noteName.charAt(0);
 	};
 
 	// Helper to update the note label
 	const updateNoteLabel = () => {
 		if (!noteLabel) return;
 
-		const playingNoteIndex = getCurrentlyPlayingNoteIndex();
-
-		if (playingNoteIndex >= 0) {
-			const note = notes[playingNoteIndex];
-			const noteName = getNoteName(note);
-			const durationName = DURATION_NAMES[note.duration];
-
-			// Update the label with note name and duration
-			noteLabel.text(`${noteName} - ${durationName}`);
-		} else {
-			// Clear the label if no note is playing
-			noteLabel.text('');
+		// Only show label when there's a note playing
+		if (currentlyPlayingNote === -1) {
+			noteLabel.attr('visibility', 'hidden');
+			return;
 		}
+
+		const note = notes[currentlyPlayingNote];
+		const noteLetter = getNoteLetter(note);
+		const durationName = DURATION_NAMES[note.duration];
+
+		const systemIdx = getSystemIdxForY(note.y);
+		const yOffset = systemIdx * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+		const x = note.x;
+		const y = MARGIN + yOffset - 20; // Position above the staff
+
+		noteLabel
+			.attr('x', x)
+			.attr('y', y)
+			.text(`${noteLetter} - ${durationName}`)
+			.attr('visibility', 'visible');
 	};
 
 	const updateNotesHighlighting = () => {
@@ -1251,7 +1367,9 @@
 		if (playingNoteIndex !== currentlyPlayingNote) {
 			// Reset previous note if it exists
 			if (currentlyPlayingNote >= 0 && currentlyPlayingNote < notes.length) {
-				const previousElement = svg.selectAll('.note-group').nodes()[currentlyPlayingNote] as SVGGElement;
+				const previousElement = svg.selectAll('.note-group').nodes()[
+					currentlyPlayingNote
+				] as SVGGElement;
 				if (previousElement) {
 					redrawNote(previousElement, notes[currentlyPlayingNote], false);
 				}
@@ -1259,9 +1377,14 @@
 
 			// Highlight new note if it exists
 			if (playingNoteIndex >= 0) {
-				const currentElement = svg.selectAll('.note-group').nodes()[playingNoteIndex] as SVGGElement;
+				const currentElement = svg.selectAll('.note-group').nodes()[
+					playingNoteIndex
+				] as SVGGElement;
 				if (currentElement) {
 					redrawNote(currentElement, notes[playingNoteIndex], true);
+
+					// Play the sound for this note
+					playNote(notes[playingNoteIndex]);
 				}
 			}
 
@@ -1270,6 +1393,139 @@
 			// Update note label
 			updateNoteLabel();
 		}
+	};
+
+	// Initialize the Tone.js synthesizer
+	const initializeSynth = async () => {
+		if (soundInitialized) return;
+
+		try {
+			// This must be triggered by a user interaction
+			await Tone.start();
+
+			// Create a polyphonic synthesizer with piano sound
+			synth = new Tone.PolySynth(Tone.Synth).toDestination();
+
+			// Set default envelope for piano-like sound
+			synth.set({
+				envelope: {
+					attack: 0.02,
+					decay: 0.1,
+					sustain: 0.3,
+					release: 1
+				}
+			});
+
+			soundInitialized = true;
+			console.log('Audio initialized');
+		} catch (error) {
+			console.error('Error initializing audio:', error);
+		}
+	};
+
+	// Play a note using Tone.js
+	const playNote = (note: Note) => {
+		if (!soundInitialized || !synth) return;
+
+		try {
+			// Get the note name (e.g., "C4")
+			const noteWithOctave = getNoteWithOctave(note);
+			if (noteWithOctave === 'Unknown') return;
+
+			// Calculate duration based on the note type and tempo
+			const durationSeconds = NOTE_DURATIONS_SECONDS[note.duration] * (60 / playbackSpeed);
+
+			// Play the note
+			synth.triggerAttackRelease(noteWithOctave, durationSeconds);
+
+			if (browser && import.meta.env?.DEV) {
+				console.log(`Playing note: ${noteWithOctave}, duration: ${durationSeconds}s`);
+			}
+		} catch (error) {
+			console.error('Error playing note:', error);
+		}
+	};
+
+	// Helper to get the full note name with octave, accounting for key signature
+	const getNoteWithOctave = (note: Note): string => {
+		try {
+			// Find which system this note is in
+			const systemCount = Math.ceil(barCount / barsPerSystem);
+			let systemIdx = 0;
+			let foundSystem = false;
+
+			for (let sys = 0; sys < systemCount; sys++) {
+				const yOffset = sys * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+				const staffTop = MARGIN + yOffset - STAFF_SPACING * EXTRA_LEDGER;
+				const staffBottom = MARGIN + yOffset + STAFF_SPACING * (STAFF_LINES - 1 + EXTRA_LEDGER);
+
+				if (note.y >= staffTop && note.y <= staffBottom) {
+					systemIdx = sys;
+					foundSystem = true;
+					break;
+				}
+			}
+
+			if (!foundSystem) return 'Unknown';
+
+			// Calculate the note's position within its system (0 = top line, ascending downward)
+			const yOffset = systemIdx * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+			const relativePosition = Math.round((note.y - (MARGIN + yOffset)) / (STAFF_SPACING / 2));
+
+			// Get the note name based on clef and position
+			if (!NOTE_NAMES[selectedClef]) return 'C4'; // Default to C4 if clef not found
+
+			let baseNote = NOTE_NAMES[selectedClef][relativePosition] || 'C4';
+
+			// Apply key signature adjustments
+			if (selectedKeySignature) {
+				// Extract the note letter without the octave
+				const noteLetter = baseNote.charAt(0);
+				const octave = baseNote.slice(1);
+
+				// Apply sharps (need to handle F#, C#, G#, D#, A#, E#, B# in order)
+				if (selectedKeySignature.sharps > 0) {
+					// Order of sharps in key signatures: F, C, G, D, A, E, B
+					const sharpOrder = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
+					const sharpCount = selectedKeySignature.sharps;
+
+					for (let i = 0; i < sharpCount; i++) {
+						if (noteLetter === sharpOrder[i]) {
+							// Apply sharp to this note
+							return noteLetter + '#' + octave;
+						}
+					}
+				}
+
+				// Apply flats (need to handle Bb, Eb, Ab, Db, Gb, Cb, Fb in order)
+				if (selectedKeySignature.flats > 0) {
+					// Order of flats in key signatures: B, E, A, D, G, C, F
+					const flatOrder = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
+					const flatCount = selectedKeySignature.flats;
+
+					for (let i = 0; i < flatCount; i++) {
+						if (noteLetter === flatOrder[i]) {
+							// Apply flat to this note
+							return noteLetter + 'b' + octave;
+						}
+					}
+				}
+			}
+
+			return baseNote;
+		} catch (error) {
+			console.error('Error getting note with octave:', error);
+			return 'C4'; // Default fallback
+		}
+	};
+
+	// Map duration to note length in seconds
+	const NOTE_DURATIONS_SECONDS: Record<string, number> = {
+		whole: 4,
+		half: 2,
+		quarter: 1,
+		eighth: 0.5,
+		sixteenth: 0.25
 	};
 </script>
 
@@ -1328,7 +1584,7 @@
 	</div>
 
 	<div style="margin-top: 1em;">
-		<label for="keySignature" style="margin-left:1em;">Key: </label>
+		<label for="keySignature" style="margin-left:1em;">Key Signature: </label>
 		<select
 			id="keySignature"
 			bind:value={selectedKeySignature}
@@ -1379,23 +1635,16 @@
 			}}
 			aria-label="Playback speed in beats per minute"
 		/>
-	</div>
 
-	<div style="margin-top: 1em;">
-		<label for="keySignature" style="margin-left:1em;">Key Signature: </label>
-		<select
-			id="keySignature"
-			bind:value={selectedKeySignature}
-			on:change={() => {
-				keySignaturesNeedUpdate = true;
-				redraw();
-			}}
-			aria-label="Select key signature"
+		<!-- Sound initialization button - needed because audio context must be started by user interaction -->
+		<button
+			on:click={initializeSynth}
+			style="margin-left: 1em;"
+			aria-label="Initialize sound"
+			class={soundInitialized ? 'sound-on' : 'sound-init'}
 		>
-			{#each KEY_SIGNATURES as keySig}
-				<option value={keySig}>{keySig.name}</option>
-			{/each}
-		</select>
+			{soundInitialized ? '🔊 Sound On' : '🔈 Initialize Sound'}
+		</button>
 	</div>
 
 	<div style="margin-top: 0.5em; font-size: 0.9em; color: #555;">
@@ -1427,7 +1676,7 @@
 		cursor: pointer;
 	}
 	:global(.note-group) {
-		cursor: grab;
+		cursor: pointer;
 	}
 	:global(.note-group.dragging) {
 		cursor: grabbing;
@@ -1439,5 +1688,20 @@
 	}
 	:global(.bar-hitbox:hover) {
 		stroke: rgba(78, 121, 167, 0.3);
+	}
+
+	/* Add styling for sound buttons */
+	.sound-init {
+		background-color: #f0f0f0;
+		border: 1px solid #ccc;
+		padding: 0.3em 0.6em;
+		border-radius: 4px;
+	}
+
+	.sound-on {
+		background-color: #d4f7d4;
+		border: 1px solid #4caf50;
+		padding: 0.3em 0.6em;
+		border-radius: 4px;
 	}
 </style>
