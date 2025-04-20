@@ -244,6 +244,24 @@
 		beatUnit: number; // Duration of one beat (4 = quarter note, 8 = eighth note)
 	}
 
+	// Note name mappings by clef and staff position
+	// Each clef has a different reference for what each staff position means
+	const NOTE_NAMES = {
+		treble: ['E5', 'D5', 'C5', 'B4', 'A4', 'G4', 'F4', 'E4', 'D4', 'C4', 'B3', 'A3', 'G3', 'F3', 'E3', 'D3', 'C3', 'B2', 'A2'],
+		bass: ['G3', 'F3', 'E3', 'D3', 'C3', 'B2', 'A2', 'G2', 'F2', 'E2', 'D2', 'C2', 'B1', 'A1', 'G1', 'F1', 'E1', 'D1', 'C1'],
+		alto: ['A4', 'G4', 'F4', 'E4', 'D4', 'C4', 'B3', 'A3', 'G3', 'F3', 'E3', 'D3', 'C3', 'B2', 'A2', 'G2', 'F2', 'E2', 'D2'],
+		tenor: ['F4', 'E4', 'D4', 'C4', 'B3', 'A3', 'G3', 'F3', 'E3', 'D3', 'C3', 'B2', 'A2', 'G2', 'F2', 'E2', 'D2', 'C2', 'B1']
+	};
+
+	// Duration name mappings
+	const DURATION_NAMES = {
+		whole: 'whole',
+		half: 'half',
+		quarter: 'quarter',
+		eighth: 'eighth',
+		sixteenth: 'sixteenth'
+	};
+
 	// Function to encode glyphs for the SMuFL font
 	const smuflChar = (codepoint: string) => {
 		try {
@@ -308,6 +326,16 @@
 	let beatsNeedUpdate = true;
 	let clefsNeedUpdate = true;
 	let keySignaturesNeedUpdate = true;
+
+	// Playback variables
+	let isPlaying = false;
+	let playbackSpeed = 100; // BPM (beats per minute)
+	let cursorPosition = 0; // Current cursor position (index in validXPositions)
+	let animationFrameId: number | null = null;
+	let lastTimestamp: number | null = null;
+	let playbackCursor: any = null; // Using any to avoid d3 type issues
+	let currentlyPlayingNote: number = -1; // Index of the note currently being highlighted during playback
+	let noteLabel: any = null; // Label for displaying note name and duration
 
 	// Remove console.log outside development
 	$: if (browser && import.meta.env?.DEV) console.log(notes);
@@ -546,20 +574,20 @@
 						d3.select(this).attr('transform', `translate(${d.x}, ${d.y})`);
 
 						// Redraw the note to update stem
-						redrawNote(this, d);
+						redrawNote(this, d, getCurrentlyPlayingNoteIndex() === notes.indexOf(d));
 					})
 			);
 
 		// Draw each note according to its duration
-		noteGroups.each(function (d: Note, i: number, elements: SVGGElement[]) {
-			redrawNote(this as SVGGElement, d);
+		noteGroups.each(function (d: Note, i: number) {
+			redrawNote(this as SVGGElement, d, getCurrentlyPlayingNoteIndex() === i);
 		});
 
 		notesNeedUpdate = false;
 	};
 
 	// Helper function to draw a single note with the correct appearance
-	const redrawNote = (element: SVGGElement, note: Note) => {
+	const redrawNote = (element: SVGGElement, note: Note, isPlaying: boolean = false) => {
 		if (!element) return;
 
 		// Clear any existing content
@@ -575,6 +603,7 @@
 				.attr('font-size', NOTE_FONT_SIZE)
 				.attr('y', 0) // Center exactly on the Y position
 				.attr('aria-hidden', 'true') // Hide from screen readers since it's visual
+				.attr('fill', isPlaying ? '#0077cc' : 'black') // Blue when played, black otherwise
 				.text(smuflChar(NOTE_GLYPHS[note.duration]));
 
 			// Add flags for eighth notes and shorter (without stems)
@@ -592,12 +621,16 @@
 					.attr('x', flagX)
 					.attr('y', flagY)
 					.attr('aria-hidden', 'true') // Hide from screen readers
+					.attr('fill', isPlaying ? '#0077cc' : 'black') // Blue when played, black otherwise
 					.text(smuflChar(FLAG_GLYPHS[note.duration].up));
 			}
 		} catch (error) {
 			console.error('Error drawing note:', error);
 			// Fallback - draw a simple circle if glyph rendering fails
-			d3.select(element).append('circle').attr('r', NOTE_RADIUS).attr('fill', 'black');
+			d3.select(element)
+				.append('circle')
+				.attr('r', NOTE_RADIUS)
+				.attr('fill', isPlaying ? '#0077cc' : 'black'); // Blue when played, black otherwise
 		}
 	};
 
@@ -733,44 +766,175 @@
 		keySignaturesNeedUpdate = false;
 	};
 
-	const updateGhost = (x: number, y: number) => {
+	const drawPlaybackCursor = () => {
 		if (!svg) return;
 
-		svg.selectAll('.ghost-note-group').remove();
+		// Remove any existing cursor and label
+		svg.selectAll('line.playback-cursor').remove();
+		svg.selectAll('text.note-label').remove();
 
-		// Find the closest valid positions
-		const closestX = snapToClosest(x, validXPositions);
-		const closestY = snapToClosest(y, validYPositions);
+		if (!isPlaying && cursorPosition === 0) return;
 
-		// Check if there's already a note at this position or if it's on a barline
-		if (!notes.some((n) => n.x === closestX && n.y === closestY) && !isBarlineX(closestX)) {
-			// Create ghost note with selected duration
-			ghost = {
-				x: closestX,
-				y: closestY,
-				duration: selectedNoteDuration
-			};
+		// Get the current x position
+		const x = validXPositions[cursorPosition] || validXPositions[0];
 
-			// Create ghost note group
-			const ghostGroup = svg
-				.append('g')
-				.attr('class', 'ghost-note-group')
-				.attr('transform', `translate(${closestX}, ${closestY})`)
-				.style('opacity', 0.5)
-				.attr('aria-hidden', 'true'); // Accessibility improvement
+		// Determine which system this position is in
+		const systemIdx = Math.floor(
+			cursorPosition / (barsPerSystem * selectedTimeSignature.beatsPerBar)
+		);
+		const yOffset = systemIdx * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+		const yStart = MARGIN + yOffset;
+		const yEnd = yStart + STAFF_SPACING * (STAFF_LINES - 1);
 
-			// Draw the ghost note
-			redrawNote(ghostGroup.node() as SVGGElement, ghost);
-		} else {
-			ghost = null;
+		// Draw the cursor
+		playbackCursor = svg
+			.append('line')
+			.attr('class', 'playback-cursor')
+			.attr('x1', x)
+			.attr('x2', x)
+			.attr('y1', yStart - STAFF_SPACING) // Extend slightly above staff
+			.attr('y2', yEnd + STAFF_SPACING) // Extend slightly below staff
+			.attr('stroke', '#ff5555')
+			.attr('stroke-width', 2)
+			.attr('stroke-opacity', 0.8);
+
+		// Add note label (initially empty)
+		noteLabel = svg
+			.append('text')
+			.attr('class', 'note-label')
+			.attr('x', x)
+			.attr('y', yStart - STAFF_SPACING * 1.5) // Position above staff
+			.attr('text-anchor', 'middle')
+			.attr('font-family', 'Arial, sans-serif')
+			.attr('font-size', '14px')
+			.attr('fill', '#0077cc')
+			.attr('background', 'white')
+			.text('');
+
+		// Update the note label if there's a note at this position
+		updateNoteLabel();
+	};
+
+	const updatePlaybackCursor = () => {
+		if (!playbackCursor || !svg) return;
+
+		// Get the current x position
+		const x = validXPositions[cursorPosition] || validXPositions[0];
+
+		// Determine which system this position is in
+		const systemIdx = Math.floor(
+			cursorPosition / (barsPerSystem * selectedTimeSignature.beatsPerBar)
+		);
+		const yOffset = systemIdx * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+		const yStart = MARGIN + yOffset;
+		const yEnd = yStart + STAFF_SPACING * (STAFF_LINES - 1);
+
+		// Update the cursor position
+		playbackCursor
+			.attr('x1', x)
+			.attr('x2', x)
+			.attr('y1', yStart - STAFF_SPACING)
+			.attr('y2', yEnd + STAFF_SPACING);
+
+		// Update the label position
+		if (noteLabel) {
+			noteLabel
+				.attr('x', x)
+				.attr('y', yStart - STAFF_SPACING * 1.5);
+
+			// Update the note label if there's a note at this position
+			updateNoteLabel();
 		}
 	};
 
-	const clearGhost = () => {
-		if (!svg) return;
+	const startPlayback = () => {
+		if (isPlaying) return;
 
-		svg.selectAll('.ghost-note-group').remove();
-		ghost = null;
+		isPlaying = true;
+		lastTimestamp = null;
+		currentlyPlayingNote = -1; // Reset currently playing note
+
+		// Set up animation loop
+		const animatePlayback = (timestamp: number) => {
+			if (!isPlaying) return;
+
+			// Initialize timestamp on first frame
+			if (lastTimestamp === null) {
+				lastTimestamp = timestamp;
+				animationFrameId = requestAnimationFrame(animatePlayback);
+				return;
+			}
+
+			// Calculate time passed and whether to advance cursor
+			const deltaTime = timestamp - lastTimestamp;
+			const beatDuration = 60000 / playbackSpeed; // milliseconds per beat
+
+			if (deltaTime >= beatDuration) {
+				// Advance cursor
+				cursorPosition++;
+
+				// Reset cursor if we've reached the end
+				if (cursorPosition >= validXPositions.length) {
+					cursorPosition = 0;
+				}
+
+				// Update cursor visual position
+				updatePlaybackCursor();
+
+				// Update notes highlighting
+				updateNotesHighlighting();
+
+				// Reset timestamp
+				lastTimestamp = timestamp;
+			}
+
+			// Continue animation loop
+			animationFrameId = requestAnimationFrame(animatePlayback);
+		};
+
+		// Draw initial cursor
+		drawPlaybackCursor();
+
+		// Initialize note highlighting
+		updateNotesHighlighting();
+
+		// Start animation
+		animationFrameId = requestAnimationFrame(animatePlayback);
+	};
+
+	const stopPlayback = () => {
+		if (!isPlaying) return;
+
+		isPlaying = false;
+
+		// Cancel animation frame
+		if (animationFrameId !== null) {
+			cancelAnimationFrame(animationFrameId);
+			animationFrameId = null;
+		}
+
+		// Reset any highlighted notes
+		if (currentlyPlayingNote >= 0 && currentlyPlayingNote < notes.length) {
+			const element = svg.selectAll('.note-group').nodes()[currentlyPlayingNote] as SVGGElement;
+			if (element) {
+				redrawNote(element, notes[currentlyPlayingNote], false);
+			}
+			currentlyPlayingNote = -1;
+		}
+	};
+
+	const resetPlayback = () => {
+		stopPlayback();
+		cursorPosition = 0;
+		drawPlaybackCursor();
+	};
+
+	const togglePlayback = () => {
+		if (isPlaying) {
+			stopPlayback();
+		} else {
+			startPlayback();
+		}
 	};
 
 	/*********************
@@ -796,7 +960,7 @@
 		// We need the system index to check only barlines within that system
 		const sysIdx = getSystemIdxForY(ghost?.y || notes[0]?.y || MARGIN + STAFF_SPACING);
 		const firstBarInSystem = sysIdx * barsPerSystem;
-		const lastBarInSystem = Math.min(barCount, (sysIdx + 1) * barsPerSystem);
+		const lastBarInSystem = Math.min(barCount, (sysIdx + 1) * barsPerSystem) - 1;
 
 		// Calculate barline positions directly based on margin and barWidth
 		// This is more reliable than using validXPositions which may have gaps
@@ -877,6 +1041,7 @@
 		if (timeSignaturesNeedUpdate) drawTimeSignatures();
 		if (beatsNeedUpdate) drawBarBeats();
 		if (notesNeedUpdate) drawNotes();
+		drawPlaybackCursor(); // Always redraw cursor on full redraw
 		attachListeners();
 	};
 
@@ -916,7 +1081,7 @@
 	};
 
 	onMount(async () => {
-		if (!browser) return;
+		if (!browser) return undefined;
 
 		try {
 			// Initialize the SVG first so we can show something even if font metadata fails
@@ -957,7 +1122,155 @@
 			// Could display an error message to the user here
 			alert('Warning: Font metadata could not be loaded. Music notation display may be affected.');
 		}
+
+		// Cleanup function that explicitly returns void
+		return () => {
+			if (isPlaying) {
+				stopPlayback();
+			}
+		};
 	});
+
+	const updateGhost = (x: number, y: number) => {
+		if (!svg) return;
+
+		svg.selectAll('.ghost-note-group').remove();
+
+		// Find the closest valid positions
+		const closestX = snapToClosest(x, validXPositions);
+		const closestY = snapToClosest(y, validYPositions);
+
+		// Check if there's already a note at this position or if it's on a barline
+		if (!notes.some((n) => n.x === closestX && n.y === closestY) && !isBarlineX(closestX)) {
+			// Create ghost note with selected duration
+			ghost = {
+				x: closestX,
+				y: closestY,
+				duration: selectedNoteDuration
+			};
+
+			// Create ghost note group
+			const ghostGroup = svg
+				.append('g')
+				.attr('class', 'ghost-note-group')
+				.attr('transform', `translate(${closestX}, ${closestY})`)
+				.style('opacity', 0.5)
+				.attr('aria-hidden', 'true'); // Accessibility improvement
+
+			// Draw the ghost note
+			redrawNote(ghostGroup.node() as SVGGElement, ghost);
+		} else {
+			ghost = null;
+		}
+	};
+
+	const clearGhost = () => {
+		if (!svg) return;
+
+		svg.selectAll('.ghost-note-group').remove();
+		ghost = null;
+	};
+
+	// Helper to find if there's a note at the current cursor position
+	const getCurrentlyPlayingNoteIndex = (): number => {
+		if (!isPlaying || cursorPosition < 0 || cursorPosition >= validXPositions.length) {
+			return -1;
+		}
+
+		const cursorX = validXPositions[cursorPosition];
+		// Find a note at this position with tolerance
+		const noteIndex = notes.findIndex(
+			(note) => Math.abs(note.x - cursorX) < 2 // Small tolerance for position matching
+		);
+
+		return noteIndex;
+	};
+
+	// Helper to determine the note name based on staff position and clef
+	const getNoteName = (note: Note): string => {
+		// Find the index of the note position in the validYPositions array
+		const yIndex = validYPositions.indexOf(note.y);
+		if (yIndex === -1) return 'Unknown';
+
+		// Find which system this note is in
+		const systemCount = Math.ceil(barCount / barsPerSystem);
+		let systemIdx = 0;
+		let foundSystem = false;
+
+		for (let sys = 0; sys < systemCount; sys++) {
+			const yOffset = sys * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+			const staffTop = MARGIN + yOffset - STAFF_SPACING * EXTRA_LEDGER;
+			const staffBottom = MARGIN + yOffset + STAFF_SPACING * (STAFF_LINES - 1 + EXTRA_LEDGER);
+
+			if (note.y >= staffTop && note.y <= staffBottom) {
+				systemIdx = sys;
+				foundSystem = true;
+				break;
+			}
+		}
+
+		if (!foundSystem) return 'Unknown';
+
+		// Calculate the note's position within its system (0 = top line, ascending downward)
+		const yOffset = systemIdx * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+		const relativePosition = Math.round((note.y - (MARGIN + yOffset)) / (STAFF_SPACING / 2));
+
+		// Get the note name based on clef and position
+		const noteNames = NOTE_NAMES[selectedClef] || NOTE_NAMES.treble;
+		const noteName = noteNames[relativePosition] || 'Unknown';
+
+		// Extract just the note letter (without octave)
+		const noteLetterOnly = noteName.charAt(0);
+
+		return noteLetterOnly;
+	};
+
+	// Helper to update the note label
+	const updateNoteLabel = () => {
+		if (!noteLabel) return;
+
+		const playingNoteIndex = getCurrentlyPlayingNoteIndex();
+
+		if (playingNoteIndex >= 0) {
+			const note = notes[playingNoteIndex];
+			const noteName = getNoteName(note);
+			const durationName = DURATION_NAMES[note.duration];
+
+			// Update the label with note name and duration
+			noteLabel.text(`${noteName} - ${durationName}`);
+		} else {
+			// Clear the label if no note is playing
+			noteLabel.text('');
+		}
+	};
+
+	const updateNotesHighlighting = () => {
+		const playingNoteIndex = getCurrentlyPlayingNoteIndex();
+
+		// Only update if the playing note has changed
+		if (playingNoteIndex !== currentlyPlayingNote) {
+			// Reset previous note if it exists
+			if (currentlyPlayingNote >= 0 && currentlyPlayingNote < notes.length) {
+				const previousElement = svg.selectAll('.note-group').nodes()[currentlyPlayingNote] as SVGGElement;
+				if (previousElement) {
+					redrawNote(previousElement, notes[currentlyPlayingNote], false);
+				}
+			}
+
+			// Highlight new note if it exists
+			if (playingNoteIndex >= 0) {
+				const currentElement = svg.selectAll('.note-group').nodes()[playingNoteIndex] as SVGGElement;
+				if (currentElement) {
+					redrawNote(currentElement, notes[playingNoteIndex], true);
+				}
+			}
+
+			currentlyPlayingNote = playingNoteIndex;
+
+			// Update note label
+			updateNoteLabel();
+		}
+	};
 </script>
 
 <div style="text-align:center; margin-top: 1em;">
@@ -1015,7 +1328,7 @@
 	</div>
 
 	<div style="margin-top: 1em;">
-		<label for="keySignature" style="margin-left:1em;">Key Signature: </label>
+		<label for="keySignature" style="margin-left:1em;">Key: </label>
 		<select
 			id="keySignature"
 			bind:value={selectedKeySignature}
@@ -1039,6 +1352,49 @@
 			<option value="quarter">Quarter Note (Crotchet)</option>
 			<option value="eighth">Eighth Note (Quaver)</option>
 			<option value="sixteenth">Sixteenth Note (Semiquaver)</option>
+		</select>
+	</div>
+
+	<!-- Playback Controls -->
+	<div style="margin-top: 1em;" class="playback-controls">
+		<button on:click={togglePlayback} aria-label={isPlaying ? 'Pause playback' : 'Start playback'}>
+			{isPlaying ? '⏸️ Pause' : '▶️ Play'}
+		</button>
+
+		<button on:click={resetPlayback} aria-label="Reset to beginning"> ⏮️ Reset </button>
+
+		<label for="playbackSpeed" style="margin-left:1em;">Speed (BPM): </label>
+		<input
+			id="playbackSpeed"
+			type="number"
+			min="20"
+			max="240"
+			bind:value={playbackSpeed}
+			on:change={() => {
+				// Restart playback if already playing to apply new speed
+				if (isPlaying) {
+					stopPlayback();
+					startPlayback();
+				}
+			}}
+			aria-label="Playback speed in beats per minute"
+		/>
+	</div>
+
+	<div style="margin-top: 1em;">
+		<label for="keySignature" style="margin-left:1em;">Key Signature: </label>
+		<select
+			id="keySignature"
+			bind:value={selectedKeySignature}
+			on:change={() => {
+				keySignaturesNeedUpdate = true;
+				redraw();
+			}}
+			aria-label="Select key signature"
+		>
+			{#each KEY_SIGNATURES as keySig}
+				<option value={keySig}>{keySig.name}</option>
+			{/each}
 		</select>
 	</div>
 
