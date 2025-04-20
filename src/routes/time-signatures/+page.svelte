@@ -443,7 +443,7 @@
 	let animationFrameId: number | null = null;
 	let lastTimestamp: number | null = null;
 	let playbackCursor: any = null; // Using any to avoid d3 type issues
-	let currentlyPlayingNote: number = -1; // Index of the note currently being highlighted during playback
+	let currentlyPlayingNotes: number[] = []; // Indices of notes currently being highlighted during playback
 	let noteLabel: any = null; // Label for displaying note name and duration
 
 	// Sound variables
@@ -966,7 +966,7 @@
 
 		isPlaying = true;
 		lastTimestamp = null;
-		currentlyPlayingNote = -1; // Reset currently playing note
+		currentlyPlayingNotes = []; // Reset currently playing notes
 
 		// Set up animation loop
 		const animatePlayback = (timestamp: number) => {
@@ -1028,12 +1028,14 @@
 		}
 
 		// Reset any highlighted notes
-		if (currentlyPlayingNote >= 0 && currentlyPlayingNote < notes.length) {
-			const element = svg.selectAll('.note-group').nodes()[currentlyPlayingNote] as SVGGElement;
-			if (element) {
-				redrawNote(element, notes[currentlyPlayingNote], false);
+		if (currentlyPlayingNotes.length > 0) {
+			for (const idx of currentlyPlayingNotes) {
+				const element = svg.selectAll('.note-group').nodes()[idx] as SVGGElement;
+				if (element) {
+					redrawNote(element, notes[idx], false);
+				}
 			}
-			currentlyPlayingNote = -1;
+			currentlyPlayingNotes = [];
 		}
 	};
 
@@ -1339,59 +1341,119 @@
 		if (!noteLabel) return;
 
 		// Only show label when there's a note playing
-		if (currentlyPlayingNote === -1) {
+		if (currentlyPlayingNotes.length === 0) {
 			noteLabel.attr('visibility', 'hidden');
 			return;
 		}
 
-		const note = notes[currentlyPlayingNote];
-		const noteLetter = getNoteLetter(note);
-		const durationName = DURATION_NAMES[note.duration];
-
-		const systemIdx = getSystemIdxForY(note.y);
+		// Get the first note for positioning
+		const firstNote = notes[currentlyPlayingNotes[0]];
+		const systemIdx = getSystemIdxForY(firstNote.y);
 		const yOffset = systemIdx * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
-		const x = note.x;
+		const x = firstNote.x;
 		const y = MARGIN + yOffset - 20; // Position above the staff
 
-		noteLabel
-			.attr('x', x)
-			.attr('y', y)
-			.text(`${noteLetter} - ${durationName}`)
-			.attr('visibility', 'visible');
+		// Generate description text
+		const labelText = getChordDescription(currentlyPlayingNotes);
+
+		// Update the label
+		noteLabel.attr('x', x).attr('y', y).text(labelText).attr('visibility', 'visible');
 	};
 
+	// Helper to find all notes at the current cursor position (for chord support)
+	const getNotesAtCurrentPosition = (): number[] => {
+		const cursorX = validXPositions[cursorPosition];
+
+		// Determine which system the cursor is currently in
+		const systemIdx = Math.floor(
+			cursorPosition / (barsPerSystem * selectedTimeSignature.beatsPerBar)
+		);
+		const yOffset = systemIdx * (STAFF_SPACING * (STAFF_LINES - 1) + SYSTEM_MARGIN_TOP);
+		const yStart = MARGIN + yOffset - STAFF_SPACING * EXTRA_LEDGER;
+		const yEnd = MARGIN + yOffset + STAFF_SPACING * (STAFF_LINES - 1 + EXTRA_LEDGER);
+
+		// Find all notes at this x position (within a small tolerance) that are also in the current system
+		const noteIndices = notes
+			.map((note, index) => ({ note, index }))
+			.filter(
+				(item) =>
+					Math.abs(item.note.x - cursorX) < 2 && item.note.y >= yStart && item.note.y <= yEnd
+			)
+			.map((item) => item.index);
+
+		return noteIndices;
+	};
+
+	// Helper to determine if the set of playing notes has changed
 	const updateNotesHighlighting = () => {
-		const playingNoteIndex = getCurrentlyPlayingNoteIndex();
+		const currentNoteIndices = getNotesAtCurrentPosition();
+		let hasChanged = false;
 
-		// Only update if the playing note has changed
-		if (playingNoteIndex !== currentlyPlayingNote) {
-			// Reset previous note if it exists
-			if (currentlyPlayingNote >= 0 && currentlyPlayingNote < notes.length) {
-				const previousElement = svg.selectAll('.note-group').nodes()[
-					currentlyPlayingNote
-				] as SVGGElement;
-				if (previousElement) {
-					redrawNote(previousElement, notes[currentlyPlayingNote], false);
+		// Check if the set of playing notes has changed
+		if (currentNoteIndices.length !== currentlyPlayingNotes.length) {
+			hasChanged = true;
+		} else {
+			// Check if any indices differ
+			for (let i = 0; i < currentNoteIndices.length; i++) {
+				if (!currentlyPlayingNotes.includes(currentNoteIndices[i])) {
+					hasChanged = true;
+					break;
+				}
+			}
+		}
+
+		// Only update if the playing notes have changed
+		if (hasChanged) {
+			// Reset previous notes
+			for (const prevIndex of currentlyPlayingNotes) {
+				if (prevIndex >= 0 && prevIndex < notes.length) {
+					const prevElement = svg.selectAll('.note-group').nodes()[prevIndex] as SVGGElement;
+					if (prevElement) {
+						redrawNote(prevElement, notes[prevIndex], false);
+					}
 				}
 			}
 
-			// Highlight new note if it exists
-			if (playingNoteIndex >= 0) {
-				const currentElement = svg.selectAll('.note-group').nodes()[
-					playingNoteIndex
-				] as SVGGElement;
-				if (currentElement) {
-					redrawNote(currentElement, notes[playingNoteIndex], true);
+			// Highlight new notes and play them
+			if (currentNoteIndices.length > 0) {
+				// Create array to collect all notes to play in this chord
+				const notesToPlay: Note[] = [];
 
-					// Play the sound for this note
-					playNote(notes[playingNoteIndex]);
+				// Highlight each note in the chord
+				for (const idx of currentNoteIndices) {
+					const currentElement = svg.selectAll('.note-group').nodes()[idx] as SVGGElement;
+					if (currentElement) {
+						redrawNote(currentElement, notes[idx], true);
+						notesToPlay.push(notes[idx]);
+					}
+				}
+
+				// Play all notes in the chord simultaneously
+				if (notesToPlay.length > 0) {
+					playChord(notesToPlay);
 				}
 			}
 
-			currentlyPlayingNote = playingNoteIndex;
+			// Update current playing notes
+			currentlyPlayingNotes = [...currentNoteIndices];
 
 			// Update note label
 			updateNoteLabel();
+		}
+	};
+
+	// Helper to get a descriptive name for a chord
+	const getChordDescription = (noteIndices: number[]): string => {
+		if (noteIndices.length === 0) return '';
+		if (noteIndices.length === 1) {
+			// Single note - show its name and duration
+			const note = notes[noteIndices[0]];
+			const noteLetter = getNoteLetter(note);
+			const durationName = DURATION_NAMES[note.duration];
+			return `${noteLetter} - ${durationName}`;
+		} else {
+			// For chords, show number of notes and the duration
+			return `Chord (${noteIndices.length} notes) - ${DURATION_NAMES[notes[noteIndices[0]].duration]}`;
 		}
 	};
 
@@ -1423,7 +1485,39 @@
 		}
 	};
 
-	// Play a note using Tone.js
+	// Play a chord (multiple notes simultaneously)
+	const playChord = (chordNotes: Note[]) => {
+		if (!soundInitialized || !synth || chordNotes.length === 0) return;
+
+		try {
+			// Get all note names with octaves
+			const noteNames = chordNotes
+				.map((note) => getNoteWithOctave(note))
+				.filter((name) => name !== 'Unknown');
+
+			if (noteNames.length === 0) return;
+
+			// Use the duration of the first note in the chord
+			const durationSeconds = NOTE_DURATIONS_SECONDS[chordNotes[0].duration] * (60 / playbackSpeed);
+
+			// For a single note, use the simpler method
+			if (noteNames.length === 1) {
+				synth.triggerAttackRelease(noteNames[0], durationSeconds);
+			} else {
+				// For multiple notes (actual chord), use the chord method
+				// Use the Tone.js chord method correctly
+				synth.triggerAttackRelease(noteNames, durationSeconds);
+			}
+
+			if (browser && import.meta.env?.DEV) {
+				console.log(`Playing chord: ${noteNames.join(', ')}, duration: ${durationSeconds}s`);
+			}
+		} catch (error) {
+			console.error('Error playing chord:', error);
+		}
+	};
+
+	// Play a single note (keeping this for backward compatibility)
 	const playNote = (note: Note) => {
 		if (!soundInitialized || !synth) return;
 
