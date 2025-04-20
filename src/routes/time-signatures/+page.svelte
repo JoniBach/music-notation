@@ -76,6 +76,10 @@
 	const TIME_SIG_NUMERATOR_OFFSET_Y = 1; // offset from middle line
 	const TIME_SIG_DENOMINATOR_OFFSET_Y = 3; // offset from middle line
 
+	// Tolerances and other constants (formerly magic numbers)
+	const BARLINE_DETECTION_TOLERANCE_FACTOR = 0.3;
+	const DIGIT_WIDTH_FACTOR = 0.7;
+
 	const DEFAULT_TIME_SIGNATURES: {
 		numerator: number;
 		denominator: number;
@@ -110,12 +114,29 @@
 
 	// Function to encode glyphs for the SMuFL font
 	const smuflChar = (codepoint: string) => {
-		return String.fromCodePoint(parseInt(codepoint.replace('U+', ''), 16));
+		try {
+			return String.fromCodePoint(parseInt(codepoint.replace('U+', ''), 16));
+		} catch (error) {
+			console.error(`Invalid SMuFL codepoint: ${codepoint}`);
+			return '?'; // Fallback character
+		}
 	};
 
 	/** Returns the closest value contained in an ordered numeric array */
 	const snapToClosest = (val: number, valid: number[]) =>
 		valid.reduce((a, b) => (Math.abs(b - val) < Math.abs(a - val) ? b : a));
+
+	// Memoization helper for expensive calculations
+	const memoize = <T extends (...args: any[]) => any>(fn: T) => {
+		const cache = new Map<string, ReturnType<T>>();
+		return (...args: Parameters<T>): ReturnType<T> => {
+			const key = JSON.stringify(args);
+			if (cache.has(key)) return cache.get(key) as ReturnType<T>;
+			const result = fn(...args);
+			cache.set(key, result);
+			return result;
+		};
+	};
 
 	// Arrays filled later via reactive statements
 	let validXPositions: number[] = [];
@@ -141,7 +162,15 @@
 	let noteCount = 0; // Total number of available note positions
 	let ghost: Note | null = null; // Ghost note for preview
 
-	$: console.log(notes);
+	// Track what needs redrawing to avoid unnecessary operations
+	let staffLinesNeedUpdate = true;
+	let barLinesNeedUpdate = true;
+	let timeSignaturesNeedUpdate = true;
+	let notesNeedUpdate = true;
+	let beatsNeedUpdate = true;
+
+	// Remove console.log outside development
+	$: if (browser && import.meta.env?.DEV) console.log(notes);
 
 	// Derived numbers that automatically update when dependencies change
 	$: barsPerSystem = Math.max(1, Math.floor(SYSTEM_WIDTH / MIN_BAR_WIDTH));
@@ -153,24 +182,36 @@
 
 	/** Compute valid X positions for every possible slot in the score, respecting time signatures */
 	$: {
-		validXPositions = [];
+		// Memoize the X positions calculation for better performance
+		const calculateValidXPositions = memoize(
+			(
+				barCountParam: number,
+				barsPerSystemParam: number,
+				barWidthParam: number,
+				beatsPerBarParam: number
+			) => {
+				const positions: number[] = [];
 
-		// Use the same time signature for all bars
-		const beatsPerBar = selectedTimeSignature.beatsPerBar;
+				for (let barIdx = 0; barIdx < barCountParam; barIdx++) {
+					const barPositionInSystem = barIdx % barsPerSystemParam;
+					const xBarStart = MARGIN + barPositionInSystem * barWidthParam;
+					const beatWidth = barWidthParam / beatsPerBarParam;
 
-		for (let barIdx = 0; barIdx < barCount; barIdx++) {
-			const systemIdx = Math.floor(barIdx / barsPerSystem);
-			const barPositionInSystem = barIdx % barsPerSystem;
-			const xBarStart = MARGIN + barPositionInSystem * barWidth;
+					for (let beat = 0; beat < beatsPerBarParam; beat++) {
+						positions.push(xBarStart + (beat + 0.5) * beatWidth);
+					}
+				}
 
-			// Create slots based on time signature (beat divisions)
-			const beatWidth = barWidth / beatsPerBar;
-
-			for (let beat = 0; beat < beatsPerBar; beat++) {
-				// For each beat, add a position
-				validXPositions.push(xBarStart + (beat + 0.5) * beatWidth);
+				return positions;
 			}
-		}
+		);
+
+		validXPositions = calculateValidXPositions(
+			barCount,
+			barsPerSystem,
+			barWidth,
+			selectedTimeSignature.beatsPerBar
+		);
 	}
 
 	/** Compute valid Y positions for every ledger‑adjusted staff line across systems */
@@ -213,16 +254,19 @@
 		// Sort positions from top to bottom for consistency
 		validYPositions.sort((a, b) => a - b);
 
-		// Log for debugging
-		console.log('Valid Y positions:', validYPositions);
+		// Log only in development
+		if (browser && import.meta.env?.DEV) console.log('Valid Y positions:', validYPositions);
 	}
 
 	/*********************
 	 *  D3 – renderers   *
 	 *********************/
-	let svg: any;
+	// Use a simpler typing approach for d3 selection
+	let svg: ReturnType<typeof d3.select>;
 
 	const drawStaffLines = () => {
+		if (!svg) return;
+
 		svg.selectAll('line.staff').remove();
 		svg.selectAll('circle.debug-point').remove(); // Remove debug points if any
 
@@ -245,9 +289,13 @@
 			// For debugging: Add small colored circles at each valid Y position
 			// This helps visualize where notes can be placed
 		}
+
+		staffLinesNeedUpdate = false;
 	};
 
 	const drawBarlines = () => {
+		if (!svg) return;
+
 		svg.selectAll('line.bar').remove();
 		svg.selectAll('rect.bar-hitbox').remove();
 
@@ -271,9 +319,13 @@
 					.attr('stroke-width', 2);
 			}
 		}
+
+		barLinesNeedUpdate = false;
 	};
 
 	const drawBarBeats = () => {
+		if (!svg) return;
+
 		svg.selectAll('line.beat').remove();
 
 		// Use the same time signature for all bars
@@ -302,9 +354,13 @@
 					.attr('stroke-dasharray', '4,4');
 			}
 		}
+
+		beatsNeedUpdate = false;
 	};
 
 	const drawNotes = () => {
+		if (!svg) return;
+
 		svg.selectAll('.note-group').remove();
 
 		// Create a group for each note
@@ -316,97 +372,93 @@
 			.attr('class', 'note-group')
 			.attr('transform', (d: Note) => `translate(${d.x}, ${d.y})`)
 			.call(
-				d3.drag().on('drag', function (event: any, d: Note) {
-					// Direct snapping to valid positions
-					d.x = snapToClosest(
-						Math.min(Math.max(event.x, MARGIN), SVG_WIDTH - MARGIN),
-						validXPositions
-					);
-					d.y = snapToClosest(event.y, validYPositions);
+				d3
+					.drag()
+					.on('start', function (this: SVGGElement) {
+						// Add a visual feedback class
+						d3.select(this).classed('dragging', true);
+					})
+					.on('drag', function (this: SVGGElement, event: any, d: Note) {
+						// Optimize by only updating visual position during drag
+						const newX = Math.min(Math.max(event.x, MARGIN), SVG_WIDTH - MARGIN);
+						const newY = event.y;
 
-					// Update the note position
-					d3.select(this as Element).attr('transform', `translate(${d.x}, ${d.y})`);
+						// Update visual position without snapping during drag for better performance
+						d3.select(this).attr('transform', `translate(${newX}, ${newY})`);
+					})
+					.on('end', function (this: SVGGElement, event: any, d: Note) {
+						// Remove visual feedback class
+						d3.select(this).classed('dragging', false);
 
-					// Redraw the note to update stem
-					redrawNote(this as SVGGElement, d);
-				})
+						// Apply snapping only at the end of drag for better performance
+						d.x = snapToClosest(
+							Math.min(Math.max(event.x, MARGIN), SVG_WIDTH - MARGIN),
+							validXPositions
+						);
+						d.y = snapToClosest(event.y, validYPositions);
+
+						// Update the note position with final snapped position
+						d3.select(this).attr('transform', `translate(${d.x}, ${d.y})`);
+
+						// Redraw the note to update stem
+						redrawNote(this, d);
+					})
 			);
 
 		// Draw each note according to its duration
 		noteGroups.each(function (d: Note, i: number, elements: SVGGElement[]) {
 			redrawNote(this as SVGGElement, d);
 		});
+
+		notesNeedUpdate = false;
 	};
 
 	// Helper function to draw a single note with the correct appearance
 	const redrawNote = (element: SVGGElement, note: Note) => {
+		if (!element) return;
+
 		// Clear any existing content
 		d3.select(element).selectAll('*').remove();
 
-		// Draw the notehead with exact positioning
-		d3.select(element)
-			.append('text')
-			.attr('class', 'smuFL')
-			.attr('text-anchor', 'middle')
-			.attr('dominant-baseline', 'middle')
-			.attr('font-size', NOTE_FONT_SIZE)
-			.attr('y', 0) // Center exactly on the Y position
-			.text(smuflChar(NOTE_GLYPHS[note.duration]));
-
-		// Add flags for eighth notes and shorter (without stems)
-		if (note.duration === 'eighth' || note.duration === 'sixteenth') {
-			// Position flag where the top of the stem would be
-			const flagX = STEM_WIDTH; // Offset to the right of notehead where stem would be
-			const flagY = -STEM_HEIGHT; // Position where the top of the stem would be
-
+		try {
+			// Draw the notehead with exact positioning
 			d3.select(element)
 				.append('text')
 				.attr('class', 'smuFL')
 				.attr('text-anchor', 'middle')
-				.attr('dominant-baseline', 'alphabetic')
+				.attr('dominant-baseline', 'middle')
 				.attr('font-size', NOTE_FONT_SIZE)
-				.attr('x', flagX)
-				.attr('y', flagY)
-				.text(smuflChar(FLAG_GLYPHS[note.duration].up));
+				.attr('y', 0) // Center exactly on the Y position
+				.attr('aria-hidden', 'true') // Hide from screen readers since it's visual
+				.text(smuflChar(NOTE_GLYPHS[note.duration]));
+
+			// Add flags for eighth notes and shorter (without stems)
+			if (note.duration === 'eighth' || note.duration === 'sixteenth') {
+				// Position flag where the top of the stem would be
+				const flagX = STEM_WIDTH; // Offset to the right of notehead where stem would be
+				const flagY = -STEM_HEIGHT; // Position where the top of the stem would be
+
+				d3.select(element)
+					.append('text')
+					.attr('class', 'smuFL')
+					.attr('text-anchor', 'middle')
+					.attr('dominant-baseline', 'alphabetic')
+					.attr('font-size', NOTE_FONT_SIZE)
+					.attr('x', flagX)
+					.attr('y', flagY)
+					.attr('aria-hidden', 'true') // Hide from screen readers
+					.text(smuflChar(FLAG_GLYPHS[note.duration].up));
+			}
+		} catch (error) {
+			console.error('Error drawing note:', error);
+			// Fallback - draw a simple circle if glyph rendering fails
+			d3.select(element).append('circle').attr('r', NOTE_RADIUS).attr('fill', 'black');
 		}
-	};
-
-	const updateGhost = (x: number, y: number) => {
-		svg.selectAll('.ghost-note-group').remove();
-
-		// Find the closest valid positions
-		const closestX = snapToClosest(x, validXPositions);
-		const closestY = snapToClosest(y, validYPositions);
-
-		// Check if there's already a note at this position or if it's on a barline
-		if (!notes.some((n) => n.x === closestX && n.y === closestY) && !isBarlineX(closestX)) {
-			// Create ghost note with selected duration
-			ghost = {
-				x: closestX,
-				y: closestY,
-				duration: selectedNoteDuration
-			};
-
-			// Create ghost note group
-			const ghostGroup = svg
-				.append('g')
-				.attr('class', 'ghost-note-group')
-				.attr('transform', `translate(${closestX}, ${closestY})`)
-				.style('opacity', 0.5);
-
-			// Draw the ghost note
-			redrawNote(ghostGroup.node() as SVGGElement, ghost);
-		} else {
-			ghost = null;
-		}
-	};
-
-	const clearGhost = () => {
-		svg.selectAll('.ghost-note-group').remove();
-		ghost = null;
 	};
 
 	const drawTimeSignatures = () => {
+		if (!svg) return;
+
 		svg.selectAll('text.time-signature').remove();
 
 		// Only draw time signature at the beginning of the first system
@@ -417,7 +469,7 @@
 		const denomStr = selectedTimeSignature.denominator.toString();
 
 		// Calculate width for centering (multi-digit support)
-		const digitWidth = TIME_SIG_FONT_SIZE * 0.7;
+		const digitWidth = TIME_SIG_FONT_SIZE * DIGIT_WIDTH_FACTOR;
 		const numWidth = numStr.length * digitWidth;
 		const denomWidth = denomStr.length * digitWidth;
 
@@ -444,6 +496,48 @@
 				.attr('text-anchor', 'middle') // Center the text
 				.text(smuflChar(TIME_SIG_GLYPHS[denomStr[i] as keyof typeof TIME_SIG_GLYPHS]));
 		}
+
+		timeSignaturesNeedUpdate = false;
+	};
+
+	const updateGhost = (x: number, y: number) => {
+		if (!svg) return;
+
+		svg.selectAll('.ghost-note-group').remove();
+
+		// Find the closest valid positions
+		const closestX = snapToClosest(x, validXPositions);
+		const closestY = snapToClosest(y, validYPositions);
+
+		// Check if there's already a note at this position or if it's on a barline
+		if (!notes.some((n) => n.x === closestX && n.y === closestY) && !isBarlineX(closestX)) {
+			// Create ghost note with selected duration
+			ghost = {
+				x: closestX,
+				y: closestY,
+				duration: selectedNoteDuration
+			};
+
+			// Create ghost note group
+			const ghostGroup = svg
+				.append('g')
+				.attr('class', 'ghost-note-group')
+				.attr('transform', `translate(${closestX}, ${closestY})`)
+				.style('opacity', 0.5)
+				.attr('aria-hidden', 'true'); // Accessibility improvement
+
+			// Draw the ghost note
+			redrawNote(ghostGroup.node() as SVGGElement, ghost);
+		} else {
+			ghost = null;
+		}
+	};
+
+	const clearGhost = () => {
+		if (!svg) return;
+
+		svg.selectAll('.ghost-note-group').remove();
+		ghost = null;
 	};
 
 	/*********************
@@ -463,7 +557,7 @@
 	const isBarlineX = (x: number) => {
 		// Get note spacing & calculate tolerance for barline detection
 		const spacing = validXPositions[1] - validXPositions[0];
-		const tolerance = spacing * 0.3;
+		const tolerance = spacing * BARLINE_DETECTION_TOLERANCE_FACTOR;
 
 		// Only check barlines within current system
 		// We need the system index to check only barlines within that system
@@ -488,12 +582,31 @@
 	 *  Ghost management *
 	 *********************/
 	const attachListeners = () => {
+		if (!svg) return;
+
+		// Debounce function to improve performance
+		const debounce = (func: Function, wait: number) => {
+			let timeout: number | null = null;
+			return (...args: any[]) => {
+				if (timeout) {
+					clearTimeout(timeout);
+				}
+				timeout = window.setTimeout(() => {
+					func(...args);
+					timeout = null;
+				}, wait);
+			};
+		};
+
+		// Debounced ghost update for better performance
+		const debouncedGhostUpdate = debounce((x: number, y: number) => {
+			updateGhost(x, y);
+		}, 10); // 10ms debounce threshold
+
 		svg
 			.on('mousemove', function (event: any) {
 				const [mx, my] = d3.pointer(event);
-
-				// Directly use the pointer coordinates - don't pre-snap
-				updateGhost(mx, my);
+				debouncedGhostUpdate(mx, my);
 			})
 			.on('mouseleave', () => {
 				clearGhost();
@@ -502,22 +615,33 @@
 			.on('click', () => {
 				if (ghost) {
 					notes = [...notes, ghost];
+					notesNeedUpdate = true; // Mark notes for update
 					redraw();
 					ghost = null;
 				}
 			});
+
+		// Add keyboard shortcuts for accessibility
+		d3.select('body').on('keydown', (event: KeyboardEvent) => {
+			// Delete key removes last placed note
+			if (event.key === 'Delete' && notes.length > 0) {
+				notes = notes.slice(0, -1);
+				notesNeedUpdate = true;
+				redraw();
+				event.preventDefault();
+			}
+		});
 	};
 
 	/*********************
 	 *  Rendering cycle  *
 	 *********************/
 	const redraw = () => {
-		svg.selectAll('*').remove();
-		drawStaffLines();
-		drawBarlines();
-		drawBarBeats();
-		drawTimeSignatures();
-		drawNotes();
+		if (staffLinesNeedUpdate) drawStaffLines();
+		if (barLinesNeedUpdate) drawBarlines();
+		if (beatsNeedUpdate) drawBarBeats();
+		if (timeSignaturesNeedUpdate) drawTimeSignatures();
+		if (notesNeedUpdate) drawNotes();
 		attachListeners();
 	};
 
@@ -525,7 +649,13 @@
 	 *  Lifecycle        *
 	 *********************/
 	const initSvg = () => {
-		svg = d3.select('#music-score').attr('width', SVG_WIDTH).attr('height', SVG_HEIGHT);
+		svg = d3
+			.select('#music-score')
+			.attr('width', SVG_WIDTH)
+			.attr('height', SVG_HEIGHT)
+			// Adding accessibility attributes
+			.attr('aria-label', 'Music score editor')
+			.attr('role', 'application');
 	};
 
 	/*********************
@@ -536,6 +666,14 @@
 		if (!isNaN(val) && val > 0) {
 			barCount = val;
 			notes = [];
+
+			// Mark all components for update
+			staffLinesNeedUpdate = true;
+			barLinesNeedUpdate = true;
+			timeSignaturesNeedUpdate = true;
+			notesNeedUpdate = true;
+			beatsNeedUpdate = true;
+
 			redraw();
 		}
 	};
@@ -544,14 +682,41 @@
 		if (!browser) return;
 
 		try {
-			const res = await fetch('/data/bravura_metadata.json');
-			const glyphs = await res.json();
-			console.log(glyphs);
-
+			// Initialize the SVG first so we can show something even if font metadata fails
 			initSvg();
+
+			// Attempt to fetch font metadata
+			const res = await fetch('/data/bravura_metadata.json');
+
+			// Check if the fetch was successful
+			if (!res.ok) {
+				throw new Error(`Failed to load font metadata: ${res.status} ${res.statusText}`);
+			}
+
+			const glyphs = await res.json();
+
+			// Only log in development
+			if (import.meta.env?.DEV) console.log(glyphs);
+
+			// Mark everything for update and redraw
+			staffLinesNeedUpdate = true;
+			barLinesNeedUpdate = true;
+			timeSignaturesNeedUpdate = true;
+			notesNeedUpdate = true;
+			beatsNeedUpdate = true;
+
 			redraw();
 		} catch (error) {
 			console.error('Error loading font metadata:', error);
+
+			// Fallback - still try to render without the metadata
+			// This ensures the app doesn't completely fail if the metadata can't be loaded
+			staffLinesNeedUpdate = true;
+			barLinesNeedUpdate = true;
+			redraw();
+
+			// Could display an error message to the user here
+			alert('Warning: Font metadata could not be loaded. Music notation display may be affected.');
 		}
 	});
 </script>
@@ -565,12 +730,22 @@
 			min="1"
 			on:input={handleBarCountChange}
 			bind:value={barCount}
+			aria-label="Number of bars"
 		/>
 	</div>
 
 	<div style="margin-top: 1em;">
 		<label for="timeSignature" style="margin-left:1em;">Time Signature: </label>
-		<select id="timeSignature" bind:value={selectedTimeSignature} on:change={redraw}>
+		<select
+			id="timeSignature"
+			bind:value={selectedTimeSignature}
+			on:change={() => {
+				timeSignaturesNeedUpdate = true;
+				beatsNeedUpdate = true;
+				redraw();
+			}}
+			aria-label="Select time signature"
+		>
 			{#each DEFAULT_TIME_SIGNATURES as timeSig}
 				<option value={timeSig}
 					>{timeSig.numerator}/{timeSig.denominator} - {timeSig.description}</option
@@ -581,7 +756,7 @@
 
 	<div style="margin-top: 1em;">
 		<label for="noteDuration" style="margin-left:1em;">Note Duration: </label>
-		<select id="noteDuration" bind:value={selectedNoteDuration}>
+		<select id="noteDuration" bind:value={selectedNoteDuration} aria-label="Select note duration">
 			<option value="whole">Whole Note (Semibreve)</option>
 			<option value="half">Half Note (Minim)</option>
 			<option value="quarter">Quarter Note (Crotchet)</option>
@@ -600,6 +775,8 @@
 	width="1000"
 	height="1000"
 	style="background: #fff; display: block; margin: 32px auto;"
+	aria-label="Interactive music notation editor"
+	role="img"
 ></svg>
 
 <style>
@@ -615,6 +792,13 @@
 	:global(.time-signature.smuFL) {
 		font-family: 'Bravura', serif;
 		cursor: pointer;
+	}
+	:global(.note-group) {
+		cursor: grab;
+	}
+	:global(.note-group.dragging) {
+		cursor: grabbing;
+		opacity: 0.8;
 	}
 	select {
 		padding: 4px 8px;
