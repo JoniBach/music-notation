@@ -11,18 +11,8 @@
 		code: 'U+E050',
 		description: 'G clef',
 		root: 'G',
-		// accidentals: [6, 3, 7, 4, 1, 5, 2],
 		accidentals: ['F5', 'C5', 'G5', 'D5', 'A5', 'E5', 'B5'],
 		cPosition: -3
-		// 	accidentals: {
-		// 	A: 1,
-		// 	B: 2,
-		// 	C: 3,
-		// 	D: 4,
-		// 	E: 5,
-		// 	F: 6,
-		// 	G: 7
-		// }
 	};
 	const TIME_SIGNATURE = {
 		numerator: 4,
