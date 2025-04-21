@@ -243,8 +243,6 @@
 		natural: { code: 'U+E261' } // accidentalNatural
 	};
 
-	const NOTE_IDS = ['double', 'whole', 'half', 'quarter', 'eighth', 'sixteenth'];
-
 	const NOTE = {
 		down: {
 			double: { name: 'Breave', description: 'Double Note', duration: 0, code: 'U+ECA0' },
@@ -264,6 +262,19 @@
 		}
 	};
 
+	const REST = {
+		double: { name: 'Breave', description: 'Double Rest', duration: 0, code: 'U+E4E2' },
+		whole: { name: 'Semibreve', description: 'Whole Rest', duration: 0, code: 'U+E4E3' },
+		half: { name: 'Minim', description: 'Half Rest', duration: 0, code: 'U+E4E4' },
+		quarter: { name: 'Crotchet', description: 'Quarter Rest', duration: 0, code: 'U+E4E5' },
+		eighth: { name: 'Quaver', description: 'Eighth Rest', duration: 0, code: 'U+E4E6' },
+		sixteenth: { name: 'Semiquaver', description: 'Sixteenth Rest', duration: 0, code: 'U+E4E7' }
+	};
+
+	const DIRECTION_IDS = ['down', 'up'];
+
+	const NOTE_IDS = ['double', 'whole', 'half', 'quarter', 'eighth', 'sixteenth'];
+
 	let bars = [
 		{ clef: 'treble', keySignature: 'c_major_a_minor', timeSignature: '4/4', notes: [] },
 		{ clef: 'bass', keySignature: 'f_major_d_minor', timeSignature: '4/4', notes: [] }
@@ -274,6 +285,7 @@
 	let clef = 'treble';
 	let note = 'double';
 	let direction = 'down';
+	let rest = false;
 </script>
 
 <div class="interface">
@@ -372,18 +384,36 @@
 	<div style="margin-top: 0.5rem;">
 		<label for="directionSelect">Direction: </label>
 		<select id="directionSelect" bind:value={direction} aria-label="Select stem direction">
-			<option value="up">Up</option>
-			<option value="down">Down</option>
+			{#each DIRECTION_IDS as dir}
+				<option value={dir}>{dir}</option>
+			{/each}
 		</select>
+	</div>
+
+	<div style="margin-top: 0.5rem;">
+		<label>Note Type: </label>
+		<label>
+			<input type="radio" bind:group={rest} value={false} />
+			Note
+		</label>
+		<label style="margin-left: 0.5rem;">
+			<input type="radio" bind:group={rest} value={true} />
+			Rest
+		</label>
 	</div>
 
 	<div style="display: flex; margin-top: 0.5rem;">
 		<p class="info">
-			Type: {NOTE[direction][note].description}
+			{rest ? REST[note].description : NOTE[direction][note].description}
 		</p>
 
 		<p class="symbol">
-			{@html String.fromCodePoint(parseInt(NOTE[direction][note].code.replace('U+', ''), 16))}
+			{@html String.fromCodePoint(
+				parseInt(
+					rest ? REST[note].code.replace('U+', '') : NOTE[direction][note].code.replace('U+', ''),
+					16
+				)
+			)}
 		</p>
 	</div>
 </div>
