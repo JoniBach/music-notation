@@ -2,661 +2,286 @@
 	import { onMount } from 'svelte';
 	import * as d3 from 'd3';
 
-	const CLEF_IDS = [
-		'treble',
-		'bass',
-		'alto',
-		'tenor'
-		// 'percussion',
-		// 'tab'
-	];
-	const KEY_SIGNATURE_IDS = [
-		'c_major_a_minor',
-		'g_major_e_minor',
-		'd_major_b_minor',
-		'a_major_f_sharp_minor',
-		'e_major_c_sharp_minor',
-		'b_major_g_sharp_minor',
-		'f_sharp_major_d_sharp_minor',
-		'c_sharp_major_a_sharp_minor',
-		'f_major_d_minor',
-		'b_flat_major_g_minor',
-		'e_flat_major_c_minor',
-		'a_flat_major_f_minor',
-		'd_flat_major_b_flat_minor',
-		'g_flat_major_e_flat_minor',
-		'c_flat_major_a_flat_minor'
-	];
-	const TIME_SIGNATURE_IDS = [
-		'4_4_common_time',
-		'3_4_waltz_time',
-		'2_4_simple_duple',
-		'6_8_compound_duple',
-		'2_2_cut_time',
-		'9_8_compound_triple'
-	];
+	let fontScale = 40; // Now reactive with binding
 
 	const CLEF = {
-		treble: { root: 'G', code: 'U+E050', description: 'G clef', name: 'Treble' },
-		bass: { root: 'F', code: 'U+E062', description: 'F clef', name: 'Bass' },
-		alto: { root: 'C', code: 'U+E05C', description: 'C clef', name: 'Alto' },
-		tenor: { root: 'C', code: 'U+E05C', description: 'C clef', name: 'Tenor' }
+		name: 'Treble',
+		code: 'U+E050',
+		description: 'G clef',
+		root: 'G',
+		mapping: [6, 3, 7, 4, 1, 5, 2]
 	};
-
 	const TIME_SIGNATURE = {
-		'4_4_common_time': {
-			numerator: 4,
-			denominator: 4,
-			description: 'Common time',
-			beatsPerBar: 4,
-			beatUnit: 4,
-			numeratorCode: 'U+E084',
-			denominatorCode: 'U+E084'
-		},
-		'3_4_waltz_time': {
-			numerator: 3,
-			denominator: 4,
-			description: 'Waltz time',
-			beatsPerBar: 3,
-			beatUnit: 4,
-			numeratorCode: 'U+E083',
-			denominatorCode: 'U+E084'
-		},
-		'2_4_simple_duple': {
-			numerator: 2,
-			denominator: 4,
-			description: 'Simple duple',
-			beatsPerBar: 2,
-			beatUnit: 4,
-			numeratorCode: 'U+E082',
-			denominatorCode: 'U+E084'
-		},
-		'6_8_compound_duple': {
-			numerator: 6,
-			denominator: 8,
-			description: 'Compound duple',
-			beatsPerBar: 6,
-			beatUnit: 8,
-			numeratorCode: 'U+E086',
-			denominatorCode: 'U+E088'
-		},
-		'2_2_cut_time': {
-			numerator: 2,
-			denominator: 2,
-			description: 'Cut time',
-			beatsPerBar: 2,
-			beatUnit: 2,
-			numeratorCode: 'U+E082',
-			denominatorCode: 'U+E082'
-		},
-		'9_8_compound_triple': {
-			numerator: 9,
-			denominator: 8,
-			description: 'Compound triple',
-			beatsPerBar: 9,
-			beatUnit: 8,
-			numeratorCode: 'U+E089',
-			denominatorCode: 'U+E088'
-		}
+		numerator: 4,
+		denominator: 4,
+		description: 'Common time',
+		beatsPerBar: 4,
+		beatUnit: 4,
+		numeratorCode: 'U+E084',
+		denominatorCode: 'U+E084'
 	};
-
 	const KEY_SIGNATURE = {
-		c_major_a_minor: {
-			root: 'C',
-			description: 'C major / A minor',
-			name: 'C major / A minor',
-			major: 'C',
-			minor: 'A',
-			sharps: 0,
-			flats: 0
-		},
-		g_major_e_minor: {
-			root: 'G',
-			description: 'G major / E minor',
-			name: 'G major / E minor',
-			major: 'G',
-			minor: 'E',
-			sharps: 1,
-			flats: 0
-		},
-		d_major_b_minor: {
-			root: 'D',
-			description: 'D major / B minor',
-			name: 'D major / B minor',
-			major: 'D',
-			minor: 'B',
-			sharps: 2,
-			flats: 0
-		},
-		a_major_f_sharp_minor: {
-			root: 'A',
-			description: 'A major / F# minor',
-			name: 'A major / F# minor',
-			major: 'A',
-			minor: 'F#',
-			sharps: 3,
-			flats: 0
-		},
-		e_major_c_sharp_minor: {
-			root: 'E',
-			description: 'E major / C# minor',
-			name: 'E major / C# minor',
-			major: 'E',
-			minor: 'C#',
-			sharps: 4,
-			flats: 0
-		},
-		b_major_g_sharp_minor: {
-			root: 'B',
-			description: 'B major / G# minor',
-			name: 'B major / G# minor',
-			major: 'B',
-			minor: 'G#',
-			sharps: 5,
-			flats: 0
-		},
-		f_sharp_major_d_sharp_minor: {
-			root: 'F#',
-			description: 'F# major / D# minor',
-			name: 'F# major / D# minor',
-			major: 'F#',
-			minor: 'D#',
-			sharps: 6,
-			flats: 0
-		},
-		c_sharp_major_a_sharp_minor: {
-			root: 'C#',
-			description: 'C# major / A# minor',
-			name: 'C# major / A# minor',
-			major: 'C#',
-			minor: 'A#',
-			sharps: 7,
-			flats: 0
-		},
-		f_major_d_minor: {
-			root: 'F',
-			description: 'F major / D minor',
-			name: 'F major / D minor',
-			major: 'F',
-			minor: 'D',
-			sharps: 0,
-			flats: 1
-		},
-		b_flat_major_g_minor: {
-			root: 'Bb',
-			description: 'Bb major / G minor',
-			name: 'Bb major / G minor',
-			major: 'Bb',
-			minor: 'G',
-			sharps: 0,
-			flats: 2
-		},
-		e_flat_major_c_minor: {
-			root: 'Eb',
-			description: 'Eb major / C minor',
-			name: 'Eb major / C minor',
-			major: 'Eb',
-			minor: 'C',
-			sharps: 0,
-			flats: 3
-		},
-		a_flat_major_f_minor: {
-			root: 'Ab',
-			description: 'Ab major / F minor',
-			name: 'Ab major / F minor',
-			major: 'Ab',
-			minor: 'F',
-			sharps: 0,
-			flats: 4
-		},
-		d_flat_major_b_flat_minor: {
-			root: 'Db',
-			description: 'Db major / Bb minor',
-			name: 'Db major / Bb minor',
-			major: 'Db',
-			minor: 'Bb',
-			sharps: 0,
-			flats: 5
-		},
-		g_flat_major_e_flat_minor: {
-			root: 'Gb',
-			description: 'Gb major / Eb minor',
-			name: 'Gb major / Eb minor',
-			major: 'Gb',
-			minor: 'Eb',
-			sharps: 0,
-			flats: 6
-		},
-		c_flat_major_a_flat_minor: {
-			root: 'Cb',
-			description: 'Cb major / Ab minor',
-			name: 'Cb major / Ab minor',
-			major: 'Cb',
-			minor: 'Ab',
-			sharps: 0,
-			flats: 7
-		}
+		root: 'C#',
+		description: 'C# major / A# minor',
+		name: 'C# major / A# minor',
+		major: 'C#',
+		minor: 'A#',
+		sharps: 7,
+		flats: 0,
+		offset: -4
 	};
 
-	const ACCIDENTAL_IDS = ['sharp', 'flat', 'natural'];
-
-	const ACCIDENTAL = {
-		sharp: { code: 'U+E262' }, // accidentalSharp
-		flat: { code: 'U+E260' }, // accidentalFlat
-		natural: { code: 'U+E261' } // accidentalNatural
+	// Bar configuration
+	const config = {
+		width: 600,
+		height: 160,
+		margin: { top: 40, right: 20, bottom: 40, left: 60 },
+		staffLines: 5,
+		staffLineSpacing: 10,
+		staffLineColor: '#000',
+		staffLineWidth: 1,
+		barLineWidth: 2
 	};
 
 	const NOTE = {
 		down: {
-			double: { name: 'Breave', description: 'Double Note', duration: 0, code: 'U+ECA0' },
-			whole: { name: 'Semibreve', description: 'Whole Note', duration: 0, code: 'U+ECA2' },
-			half: { name: 'Minim', description: 'Half Note', duration: 0, code: 'U+ECA4' },
-			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 0, code: 'U+ECA6' },
-			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0, code: 'U+ECA8' },
-			sixteenth: { name: 'Semiquaver', description: 'Sixteenth Note', duration: 0, code: 'U+E1DA' }
+			double: { name: 'Breave', description: 'Double Note', duration: 8.0, code: 'U+ECA0' },
+			whole: { name: 'Semibreve', description: 'Whole Note', duration: 4.0, code: 'U+ECA2' },
+			half: { name: 'Minim', description: 'Half Note', duration: 2.0, code: 'U+ECA4' },
+			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 1.0, code: 'U+ECA6' },
+			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0.5, code: 'U+ECA8' },
+			sixteenth: {
+				name: 'Semiquaver',
+				description: 'Sixteenth Note',
+				duration: 0.25,
+				code: 'U+E1DA'
+			}
 		},
 		up: {
-			double: { name: 'Breave', description: 'Double Note', duration: 0, code: 'U+ECA0' },
-			whole: { name: 'Semibreve', description: 'Whole Note', duration: 0, code: 'U+ECA2' },
-			half: { name: 'Minim', description: 'Half Note', duration: 0, code: 'U+ECA3' },
-			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 0, code: 'U+ECA5' },
-			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0, code: 'U+ECA7' },
-			sixteenth: { name: 'Semiquaver', description: 'Sixteenth Note', duration: 0, code: 'U+E1D9' }
-		}
-	};
-
-	const REST = {
-		double: { name: 'Breave', description: 'Double Rest', duration: 0, code: 'U+E4E2' },
-		whole: { name: 'Semibreve', description: 'Whole Rest', duration: 0, code: 'U+E4E3' },
-		half: { name: 'Minim', description: 'Half Rest', duration: 0, code: 'U+E4E4' },
-		quarter: { name: 'Crotchet', description: 'Quarter Rest', duration: 0, code: 'U+E4E5' },
-		eighth: { name: 'Quaver', description: 'Eighth Rest', duration: 0, code: 'U+E4E6' },
-		sixteenth: { name: 'Semiquaver', description: 'Sixteenth Rest', duration: 0, code: 'U+E4E7' }
-	};
-
-	const DIRECTION_IDS = ['down', 'up'];
-
-	const NOTE_IDS = ['double', 'whole', 'half', 'quarter', 'eighth', 'sixteenth'];
-
-	let bars = [
-		{ clef: 'treble', keySignature: 'c_major_a_minor', timeSignature: '4/4', notes: [] },
-		{ clef: 'bass', keySignature: 'f_major_d_minor', timeSignature: '4/4', notes: [] }
-	];
-
-	let keySignature = 'c_major_a_minor';
-	let timeSignature = '4_4_common_time';
-	let clef = 'treble';
-	let note = 'double';
-	let direction = 'down';
-	let rest = false;
-
-	// D3 staff rendering variables
-	let staffSvg;
-	let staffWidth = 600;
-	let staffHeight = 200;
-	let margins = { top: 30, right: 30, bottom: 30, left: 50 };
-	let lineSpacing = 10; // Distance between staff lines
-	let barWidth = staffWidth - margins.left - margins.right;
-	let measureCount = 4; // Number of measures in the staff
-	let measureWidth = barWidth / measureCount;
-
-	// Render the staff when the component mounts
-	onMount(() => {
-		renderStaff();
-	});
-
-	// Function to render the staff with D3
-	function renderStaff() {
-		if (!staffSvg) return;
-
-		// Clear any existing content
-		d3.select(staffSvg).selectAll('*').remove();
-
-		// Create the SVG
-		const svg = d3
-			.select(staffSvg)
-			.attr('width', staffWidth)
-			.attr('height', staffHeight)
-			.attr('viewBox', `0 0 ${staffWidth} ${staffHeight}`);
-
-		// Draw staff group with margins
-		const staff = svg.append('g').attr('transform', `translate(${margins.left}, ${margins.top})`);
-
-		// Draw the 5 horizontal staff lines
-		for (let i = 0; i < 5; i++) {
-			staff
-				.append('line')
-				.attr('x1', 0)
-				.attr('y1', i * lineSpacing)
-				.attr('x2', barWidth)
-				.attr('y2', i * lineSpacing)
-				.attr('stroke', 'black')
-				.attr('stroke-width', 1);
-		}
-
-		// Draw measure bars (vertical lines)
-		for (let i = 0; i <= measureCount; i++) {
-			const x = i * measureWidth;
-			// Make first and last bar lines thicker for double bars
-			const strokeWidth = i === 0 || i === measureCount ? 2 : 1;
-
-			staff
-				.append('line')
-				.attr('x1', x)
-				.attr('y1', 0)
-				.attr('x2', x)
-				.attr('y2', (5 - 1) * lineSpacing) // Height of staff (5 lines - 1 spacing)
-				.attr('stroke', 'black')
-				.attr('stroke-width', strokeWidth);
-		}
-
-		// Place clef at the beginning
-		const clefG = staff.append('g').attr('transform', `translate(10, ${lineSpacing * 2})`);
-
-		clefG
-			.append('text')
-			.attr('class', 'music-symbol')
-			.attr('font-family', 'Bravura')
-			.attr('font-size', '40')
-			.attr('text-anchor', 'middle')
-			.attr('dominant-baseline', 'middle')
-			.text(() => {
-				// Convert Unicode code point to character
-				return String.fromCodePoint(parseInt(CLEF[clef].code.replace('U+', ''), 16));
-			});
-
-		// Add key signature if not C major/A minor
-		if (keySignature !== 'c_major_a_minor') {
-			const keySigG = staff.append('g').attr('transform', `translate(40, ${lineSpacing * 2})`);
-
-			if (KEY_SIGNATURE[keySignature].sharps > 0) {
-				for (let i = 0; i < KEY_SIGNATURE[keySignature].sharps; i++) {
-					keySigG
-						.append('text')
-						.attr('class', 'music-symbol')
-						.attr('font-family', 'Bravura')
-						.attr('font-size', '30')
-						.attr('x', i * 15)
-						.attr('text-anchor', 'middle')
-						.attr('dominant-baseline', 'middle')
-						.text(String.fromCodePoint(parseInt(ACCIDENTAL.sharp.code.replace('U+', ''), 16)));
-				}
-			} else if (KEY_SIGNATURE[keySignature].flats > 0) {
-				for (let i = 0; i < KEY_SIGNATURE[keySignature].flats; i++) {
-					keySigG
-						.append('text')
-						.attr('class', 'music-symbol')
-						.attr('font-family', 'Bravura')
-						.attr('font-size', '30')
-						.attr('x', i * 15)
-						.attr('text-anchor', 'middle')
-						.attr('dominant-baseline', 'middle')
-						.text(String.fromCodePoint(parseInt(ACCIDENTAL.flat.code.replace('U+', ''), 16)));
-				}
+			double: { name: 'Breave', description: 'Double Note', duration: 8.0, code: 'U+ECA0' },
+			whole: { name: 'Semibreve', description: 'Whole Note', duration: 4.0, code: 'U+ECA2' },
+			half: { name: 'Minim', description: 'Half Note', duration: 2.0, code: 'U+ECA3' },
+			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 1.0, code: 'U+ECA5' },
+			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0.5, code: 'U+ECA7' },
+			sixteenth: {
+				name: 'Semiquaver',
+				description: 'Sixteenth Note',
+				duration: 0.25,
+				code: 'U+E1D9'
 			}
 		}
+	};
 
-		// Add time signature
-		const timeSigX = keySignature === 'c_major_a_minor' ? 60 : 80;
-		const timeSigG = staff
+	const barData = [
+		{ note: 'C4', duration: 'quarter' },
+		{ note: 'B4', duration: 'quarter' },
+		{ note: 'A4', duration: 'quarter' },
+		{ note: 'G4', duration: 'quarter' }
+	];
+
+	// Function to draw the staff
+	function drawStaff() {
+		// Clear any existing SVG
+		d3.select('#staff-container').select('svg').remove();
+
+		// Create the SVG container
+		const svg = d3
+			.select('#staff-container')
+			.append('svg')
+			.attr('width', config.width)
+			.attr('height', config.height)
+			.attr('viewBox', `0 0 ${config.width} ${config.height}`)
+			.attr('class', 'staff-svg');
+
+		// Create a group for the staff with margin
+		const staffGroup = svg
 			.append('g')
-			.attr('transform', `translate(${timeSigX}, ${lineSpacing * 2})`);
+			.attr('transform', `translate(${config.margin.left}, ${config.margin.top})`);
 
-		if (timeSignature === '4_4_common_time') {
-			timeSigG
-				.append('text')
-				.attr('class', 'music-symbol')
-				.attr('font-family', 'Bravura')
-				.attr('font-size', '30')
-				.attr('text-anchor', 'middle')
-				.attr('dominant-baseline', 'middle')
-				.text('𝄴'); // Common time symbol
-		} else if (timeSignature === '2_2_cut_time') {
-			timeSigG
-				.append('text')
-				.attr('class', 'music-symbol')
-				.attr('font-family', 'Bravura')
-				.attr('font-size', '30')
-				.attr('text-anchor', 'middle')
-				.attr('dominant-baseline', 'middle')
-				.text('𝄵'); // Cut time symbol
-		} else {
-			// Regular time signature
-			const numerator = TIME_SIGNATURE[timeSignature].numerator;
-			const denominator = TIME_SIGNATURE[timeSignature].denominator;
+		// Calculate effective width and height
+		const effectiveWidth = config.width - config.margin.left - config.margin.right;
+		const effectiveHeight = config.height - config.margin.top - config.margin.bottom;
 
-			timeSigG
-				.append('text')
-				.attr('class', 'music-symbol')
-				.attr('font-family', 'Bravura')
-				.attr('font-size', '20')
-				.attr('text-anchor', 'middle')
-				.attr('dominant-baseline', 'middle')
-				.attr('y', -10)
-				.text(
-					String.fromCodePoint(
-						parseInt(TIME_SIGNATURE[timeSignature].numeratorCode.replace('U+', ''), 16)
-					)
-				);
+		// Draw the staff lines
+		for (let i = 0; i < config.staffLines; i++) {
+			staffGroup
+				.append('line')
+				.attr('x1', 0)
+				.attr('y1', i * config.staffLineSpacing)
+				.attr('x2', effectiveWidth)
+				.attr('y2', i * config.staffLineSpacing)
+				.attr('stroke', config.staffLineColor)
+				.attr('stroke-width', config.staffLineWidth);
+		}
 
-			timeSigG
-				.append('text')
-				.attr('class', 'music-symbol')
-				.attr('font-family', 'Bravura')
-				.attr('font-size', '20')
-				.attr('text-anchor', 'middle')
-				.attr('dominant-baseline', 'middle')
-				.attr('y', 10)
-				.text(
-					String.fromCodePoint(
-						parseInt(TIME_SIGNATURE[timeSignature].denominatorCode.replace('U+', ''), 16)
-					)
-				);
+		// Draw bar lines at the beginning and end
+		staffGroup
+			.append('line')
+			.attr('x1', 0)
+			.attr('y1', 0)
+			.attr('x2', 0)
+			.attr('y2', (config.staffLines - 1) * config.staffLineSpacing)
+			.attr('stroke', config.staffLineColor)
+			.attr('stroke-width', config.barLineWidth);
+
+		staffGroup
+			.append('line')
+			.attr('x1', effectiveWidth)
+			.attr('y1', 0)
+			.attr('x2', effectiveWidth)
+			.attr('y2', (config.staffLines - 1) * config.staffLineSpacing)
+			.attr('stroke', config.staffLineColor)
+			.attr('stroke-width', config.barLineWidth);
+
+		// Add text for clef using Bravura font
+		staffGroup
+			.append('text')
+			.attr('x', 20)
+			.attr('y', 30)
+			.attr('text-anchor', 'middle')
+			.attr('class', 'smuFL-symbol clef-symbol')
+			.style('font-size', `${fontScale}px`)
+			.text('\uE050'); // Treble clef symbol in smuFL-symbol
+
+		// Add text for time signature using Bravura font
+		staffGroup
+			.append('text')
+			.attr('x', 50)
+			.attr('y', 10)
+			.attr('text-anchor', 'middle')
+			.attr('class', 'smuFL-symbol time-signature')
+			.style('font-size', `${fontScale}px`)
+			.text('\uE084'); // 4 in smuFL-symbol
+
+		staffGroup
+			.append('text')
+			.attr('x', 50)
+			.attr('y', 30)
+			.attr('text-anchor', 'middle')
+			.attr('class', 'smuFL-symbol time-signature')
+			.style('font-size', `${fontScale}px`)
+			.text('\uE084'); // 4 in smuFL-symbol
+
+		// Placeholder for key signature (sharps)
+		if (KEY_SIGNATURE.sharps > 0) {
+			// const sharpPositions = [0, 1, 2, 3, 4, 5, 6, 7]; // FCGDAEB order on staff
+			// FCGDAEB order on staff
+			for (let i = 0; i < KEY_SIGNATURE.sharps; i++) {
+				const position = CLEF.mapping[i % 7] - 1;
+				staffGroup
+					.append('text')
+					.attr('x', 70 + i * 15)
+					.attr('y', 25 - (position * config.staffLineSpacing) / 2)
+					.attr('text-anchor', 'middle')
+					.attr('class', 'smuFL-symbol key-signature')
+					.style('font-size', `${fontScale * 0.6}px`)
+					.text('\uE262'); // Sharp symbol in smuFL-symbol
+			}
 		}
 	}
 
-	// Update the staff when these properties change
+	// Update the staff when fontScale changes
 	$: {
-		clef, keySignature, timeSignature;
-		if (staffSvg) renderStaff();
+		if (typeof window !== 'undefined') {
+			fontScale; // reactivity trigger
+			drawStaff();
+		}
 	}
+
+	onMount(() => {
+		drawStaff();
+	});
 </script>
 
-<div class="interface">
-	<label for="keySignatureSelect">Key Signature: </label>
-	<select id="keySignatureSelect" bind:value={keySignature} aria-label="Select key signature">
-		{#each KEY_SIGNATURE_IDS as id}
-			<option value={id}>{KEY_SIGNATURE[id].name}</option>
-		{/each}
-	</select>
-	<div style="display: flex;">
-		<p class="info">
-			major: {KEY_SIGNATURE[keySignature].major}
-			minor: {KEY_SIGNATURE[keySignature].minor}
-			sharps: {KEY_SIGNATURE[keySignature].sharps}
-			flats: {KEY_SIGNATURE[keySignature].flats}
-		</p>
+<div class="container">
+	<h1>Music Staff Visualization</h1>
 
-		<p class="symbol">
-			{#if KEY_SIGNATURE[keySignature]?.sharps > 0}
-				{#each Array(KEY_SIGNATURE[keySignature].sharps) as _, i}
-					{@html String.fromCodePoint(parseInt(ACCIDENTAL.sharp.code.replace('U+', ''), 16))}
-				{/each}
-			{:else if KEY_SIGNATURE[keySignature]?.flats > 0}
-				{#each Array(KEY_SIGNATURE[keySignature].flats) as _, i}
-					{@html String.fromCodePoint(parseInt(ACCIDENTAL.flat.code.replace('U+', ''), 16))}
-				{/each}
-			{:else}
-				{@html String.fromCodePoint(parseInt(ACCIDENTAL.natural.code.replace('U+', ''), 16))}
-			{/if}
-		</p>
-	</div>
-</div>
-
-<div class="interface">
-	<label for="timeSignatureSelect">Time Signature: </label>
-	<select id="timeSignatureSelect" bind:value={timeSignature} aria-label="Select time signature">
-		{#each TIME_SIGNATURE_IDS as id}
-			<option value={id}>{TIME_SIGNATURE[id].description}</option>
-		{/each}
-	</select>
-	<div style="display: flex;">
-		<p class="info">
-			beats per bar: {TIME_SIGNATURE[timeSignature].beatsPerBar}
-			beat unit: {TIME_SIGNATURE[timeSignature].beatUnit}
-		</p>
-
-		<p class="time-symbol">
-			{#if timeSignature === '4_4_common_time'}
-				&#x1D134;
-			{:else if timeSignature === '2_2_cut_time'}
-				&#x1D135;
-			{:else}
-				<span class="time-signature-stack">
-					<span class="numerator">
-						{@html String.fromCodePoint(
-							parseInt(TIME_SIGNATURE[timeSignature].numeratorCode.replace('U+', ''), 16)
-						)}
-					</span>
-					<span class="denominator">
-						{@html String.fromCodePoint(
-							parseInt(TIME_SIGNATURE[timeSignature].denominatorCode.replace('U+', ''), 16)
-						)}
-					</span>
-				</span>
-			{/if}
-		</p>
-	</div>
-</div>
-
-<div class="interface">
-	<label for="clefSelect">Clef: </label>
-	<select id="clefSelect" bind:value={clef} aria-label="Select clef">
-		{#each CLEF_IDS as id}
-			<option value={id}>{CLEF[id].name}</option>
-		{/each}
-	</select>
-	<div style="display: flex;">
-		<p class="info">
-			root: {CLEF[clef].root}
-		</p>
-
-		<p class="symbol">
-			{@html String.fromCodePoint(parseInt(CLEF[clef].code.replace('U+', ''), 16))}
-		</p>
-	</div>
-</div>
-
-<div class="interface">
-	<label for="noteSelect">Note: </label>
-	<select id="noteSelect" bind:value={note} aria-label="Select note type">
-		{#each NOTE_IDS as id}
-			<option value={id}>{NOTE.down[id].name} - {NOTE.down[id].description}</option>
-		{/each}
-	</select>
-
-	<div style="margin-top: 0.5rem;">
-		<label for="directionSelect">Direction: </label>
-		<select id="directionSelect" bind:value={direction} aria-label="Select stem direction">
-			{#each DIRECTION_IDS as dir}
-				<option value={dir}>{dir}</option>
-			{/each}
-		</select>
+	<div class="controls">
+		<label for="font-scale">Font Scale: {fontScale}px</label>
+		<input type="range" id="font-scale" min="20" max="80" bind:value={fontScale} class="slider" />
 	</div>
 
-	<div style="margin-top: 0.5rem;">
-		<label>Note Type: </label>
-		<label>
-			<input type="radio" bind:group={rest} value={false} />
-			Note
-		</label>
-		<label style="margin-left: 0.5rem;">
-			<input type="radio" bind:group={rest} value={true} />
-			Rest
-		</label>
+	<div id="staff-container">
+		<!-- These span elements are used to reference the classes used by D3 -->
+		<span class="smuFL-symbol clef-symbol" style="display: none;"></span>
+		<span class="smuFL-symbol time-signature" style="display: none;"></span>
+		<span class="smuFL-symbol key-signature" style="display: none;"></span>
 	</div>
 
-	<div style="display: flex; margin-top: 0.5rem;">
-		<p class="info">
-			{rest ? REST[note].description : NOTE[direction][note].description}
-		</p>
-
-		<p class="symbol">
-			{@html String.fromCodePoint(
-				parseInt(
-					rest ? REST[note].code.replace('U+', '') : NOTE[direction][note].code.replace('U+', ''),
-					16
-				)
-			)}
-		</p>
-	</div>
-</div>
-
-<!-- D3 Musical Staff -->
-<div class="interface">
-	<h3>Musical Staff (D3.js)</h3>
-	<p>Below is a musical staff with {measureCount} measures.</p>
-
-	<div class="staff-controls">
-		<label>
-			Measures:
-			<input type="range" bind:value={measureCount} min="1" max="8" step="1" />
-			{measureCount}
-		</label>
-	</div>
-
-	<div class="staff-container">
-		<svg bind:this={staffSvg}></svg>
+	<div class="config-panel">
+		<h2>Current Configuration</h2>
+		<div class="config-item">
+			<strong>Clef:</strong>
+			{CLEF.name} ({CLEF.description})
+		</div>
+		<div class="config-item">
+			<strong>Time Signature:</strong>
+			{TIME_SIGNATURE.numerator}/{TIME_SIGNATURE.denominator} ({TIME_SIGNATURE.description})
+		</div>
+		<div class="config-item">
+			<strong>Key Signature:</strong>
+			{KEY_SIGNATURE.name}
+		</div>
 	</div>
 </div>
 
 <style>
-	.interface {
-		border: 1px solid #ccc;
-		padding: 1rem;
-		margin: 1rem;
+	.container {
+		max-width: 800px;
+		margin: 0 auto;
+		padding: 20px;
+		font-family: Arial, sans-serif;
 	}
-	.info {
-		font-size: 1rem;
+
+	#staff-container {
+		width: 100%;
+		margin: 20px 0;
+		border: 1px solid #ddd;
+		padding: 10px;
+		border-radius: 5px;
+		background-color: #fff;
 	}
-	.symbol {
-		font-family: 'Bravura', serif;
-		font-size: 2rem;
-		margin: 0 10px;
-		line-height: 2rem;
-		display: inline-block;
-		text-align: center;
-		vertical-align: middle;
-		align-content: center;
+
+	.config-panel {
+		margin-top: 30px;
+		padding: 15px;
+		background-color: #f5f5f5;
+		border-radius: 5px;
+		border: 1px solid #ddd;
 	}
-	.time-symbol {
-		font-family: 'Bravura', serif;
-		font-size: 2rem;
-		margin: 0 10px;
-		line-height: 2rem;
-		display: inline-block;
-		text-align: center;
-		vertical-align: middle;
-		align-content: center;
+
+	.config-item {
+		margin: 8px 0;
 	}
-	.time-signature-stack {
+
+	h1 {
+		color: #333;
+		border-bottom: 2px solid #ccc;
+		padding-bottom: 10px;
+	}
+
+	h2 {
+		color: #555;
+		font-size: 1.2rem;
+		margin-top: 0;
+	}
+
+	.controls {
+		margin: 20px 0;
+		padding: 10px;
+		background-color: #f0f0f0;
+		border-radius: 5px;
 		display: flex;
-		flex-direction: column;
 		align-items: center;
-		line-height: 1.2rem;
+		gap: 10px;
 	}
-	.numerator,
-	.denominator {
-		display: block;
+
+	.slider {
+		flex-grow: 1;
+		height: 25px;
 	}
-	.staff-container {
-		margin-top: 1rem;
-		overflow-x: auto;
-	}
-	.staff-controls {
-		margin-bottom: 1rem;
-	}
-	.music-symbol {
-		font-family: 'Bravura', serif;
+
+	:global(.smuFL-symbol) {
+		font-family: 'Bravura';
 	}
 </style>

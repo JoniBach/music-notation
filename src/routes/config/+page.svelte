@@ -245,20 +245,30 @@
 
 	const NOTE = {
 		down: {
-			double: { name: 'Breave', description: 'Double Note', duration: 0, code: 'U+ECA0' },
-			whole: { name: 'Semibreve', description: 'Whole Note', duration: 0, code: 'U+ECA2' },
-			half: { name: 'Minim', description: 'Half Note', duration: 0, code: 'U+ECA4' },
-			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 0, code: 'U+ECA6' },
-			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0, code: 'U+ECA8' },
-			sixteenth: { name: 'Semiquaver', description: 'Sixteenth Note', duration: 0, code: 'U+E1DA' }
+			double: { name: 'Breave', description: 'Double Note', duration: 8.0, code: 'U+ECA0' },
+			whole: { name: 'Semibreve', description: 'Whole Note', duration: 4.0, code: 'U+ECA2' },
+			half: { name: 'Minim', description: 'Half Note', duration: 2.0, code: 'U+ECA4' },
+			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 1.0, code: 'U+ECA6' },
+			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0.5, code: 'U+ECA8' },
+			sixteenth: {
+				name: 'Semiquaver',
+				description: 'Sixteenth Note',
+				duration: 0.25,
+				code: 'U+E1DA'
+			}
 		},
 		up: {
-			double: { name: 'Breave', description: 'Double Note', duration: 0, code: 'U+ECA0' },
-			whole: { name: 'Semibreve', description: 'Whole Note', duration: 0, code: 'U+ECA2' },
-			half: { name: 'Minim', description: 'Half Note', duration: 0, code: 'U+ECA3' },
-			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 0, code: 'U+ECA5' },
-			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0, code: 'U+ECA7' },
-			sixteenth: { name: 'Semiquaver', description: 'Sixteenth Note', duration: 0, code: 'U+E1D9' }
+			double: { name: 'Breave', description: 'Double Note', duration: 8.0, code: 'U+ECA0' },
+			whole: { name: 'Semibreve', description: 'Whole Note', duration: 4.0, code: 'U+ECA2' },
+			half: { name: 'Minim', description: 'Half Note', duration: 2.0, code: 'U+ECA3' },
+			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 1.0, code: 'U+ECA5' },
+			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0.5, code: 'U+ECA7' },
+			sixteenth: {
+				name: 'Semiquaver',
+				description: 'Sixteenth Note',
+				duration: 0.25,
+				code: 'U+E1D9'
+			}
 		}
 	};
 
