@@ -243,6 +243,27 @@
 		natural: { code: 'U+E261' } // accidentalNatural
 	};
 
+	const NOTE_IDS = ['double', 'whole', 'half', 'quarter', 'eighth', 'sixteenth'];
+
+	const NOTE = {
+		down: {
+			double: { name: 'Breave', description: 'Double Note', duration: 0, code: 'U+ECA0' },
+			whole: { name: 'Semibreve', description: 'Whole Note', duration: 0, code: 'U+ECA2' },
+			half: { name: 'Minim', description: 'Half Note', duration: 0, code: 'U+ECA4' },
+			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 0, code: 'U+ECA6' },
+			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0, code: 'U+ECA8' },
+			sixteenth: { name: 'Semiquaver', description: 'Sixteenth Note', duration: 0, code: 'U+E1DA' }
+		},
+		up: {
+			double: { name: 'Breave', description: 'Double Note', duration: 0, code: 'U+ECA0' },
+			whole: { name: 'Semibreve', description: 'Whole Note', duration: 0, code: 'U+ECA2' },
+			half: { name: 'Minim', description: 'Half Note', duration: 0, code: 'U+ECA3' },
+			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 0, code: 'U+ECA5' },
+			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0, code: 'U+ECA7' },
+			sixteenth: { name: 'Semiquaver', description: 'Sixteenth Note', duration: 0, code: 'U+E1D9' }
+		}
+	};
+
 	let bars = [
 		{ clef: 'treble', keySignature: 'c_major_a_minor', timeSignature: '4/4', notes: [] },
 		{ clef: 'bass', keySignature: 'f_major_d_minor', timeSignature: '4/4', notes: [] }
@@ -251,6 +272,8 @@
 	let keySignature = 'c_major_a_minor';
 	let timeSignature = '4_4_common_time';
 	let clef = 'treble';
+	let note = 'double';
+	let direction = 'down';
 </script>
 
 <div class="interface">
@@ -334,6 +357,33 @@
 
 		<p class="symbol">
 			{@html String.fromCodePoint(parseInt(CLEF[clef].code.replace('U+', ''), 16))}
+		</p>
+	</div>
+</div>
+
+<div class="interface">
+	<label for="noteSelect">Note: </label>
+	<select id="noteSelect" bind:value={note} aria-label="Select note type">
+		{#each NOTE_IDS as id}
+			<option value={id}>{NOTE.down[id].name} - {NOTE.down[id].description}</option>
+		{/each}
+	</select>
+
+	<div style="margin-top: 0.5rem;">
+		<label for="directionSelect">Direction: </label>
+		<select id="directionSelect" bind:value={direction} aria-label="Select stem direction">
+			<option value="up">Up</option>
+			<option value="down">Down</option>
+		</select>
+	</div>
+
+	<div style="display: flex; margin-top: 0.5rem;">
+		<p class="info">
+			Type: {NOTE[direction][note].description}
+		</p>
+
+		<p class="symbol">
+			{@html String.fromCodePoint(parseInt(NOTE[direction][note].code.replace('U+', ''), 16))}
 		</p>
 	</div>
 </div>
