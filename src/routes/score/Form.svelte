@@ -99,14 +99,32 @@
 			{/each}
 		</select>
 	</div>
-	<label>
-		Bars: <input type="range" min="1" max="24" bind:value={barCount} />
-		{barCount}
-	</label>
-	<label>
-		Radius: <input type="range" min="5" max="15" bind:value={radius} />
-		{radius}
-	</label>
+	<div class="input-group">
+		<label class="label" for="barCount">Bars</label>
+		<input
+			class="input"
+			id="barCount"
+			type="range"
+			min="1"
+			max="24"
+			bind:value={barCount}
+			aria-label="Number of bars"
+		/>
+		<span class="value">{barCount}</span>
+	</div>
+	<div class="input-group">
+		<label class="label" for="radiusRange">Radius</label>
+		<input
+			class="input"
+			id="radiusRange"
+			type="range"
+			min="5"
+			max="15"
+			bind:value={radius}
+			aria-label="Note radius"
+		/>
+		<span class="value">{radius}</span>
+	</div>
 
 	<hr />
 	<p class="headder">
