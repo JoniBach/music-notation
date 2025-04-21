@@ -5,7 +5,7 @@
 
 	<a href="/time-signatures">Time Signatures</a>
 	<a href="/config">Config</a>
-	<a href="/bars">Bars</a>
+	<a href="/bar">Bar</a>
 </div>
 
 <style>

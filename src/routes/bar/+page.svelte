@@ -11,8 +11,10 @@
 		code: 'U+E050',
 		description: 'G clef',
 		root: 'G',
-		mapping: [6, 3, 7, 4, 1, 5, 2]
-		// 	mapping: {
+		// accidentals: [6, 3, 7, 4, 1, 5, 2],
+		accidentals: ['F5', 'C5', 'G5', 'D5', 'A5', 'E5', 'B5'],
+		cPosition: -3
+		// 	accidentals: {
 		// 	A: 1,
 		// 	B: 2,
 		// 	C: 3,
@@ -82,15 +84,144 @@
 		}
 	};
 
+	const NOTES = {
+		// 3
+		A3: -7,
+		B3: -6,
+		C3: -5,
+		D3: -4,
+		E3: -3,
+		F3: -2,
+		G3: -1,
+		// 4
+		A4: 0,
+		B4: 1,
+		C4: 2,
+		D4: 3,
+		E4: 4,
+		F4: 5,
+		G4: 6,
+		// 5
+		A5: 7,
+		B5: 8,
+		C5: 9,
+		D5: 10,
+		E5: 11,
+		F5: 12,
+		G5: 13,
+		// 6
+		A6: 14,
+		B6: 15,
+		C6: 16,
+		D6: 17,
+		E6: 18,
+		F6: 19,
+		G6: 20
+	};
+
 	const barData = [
-		{ note: 'C4', duration: 'quarter' },
-		{ note: 'B4', duration: 'quarter' },
 		{ note: 'A4', duration: 'quarter' },
+		{ note: 'B4', duration: 'quarter' },
+		{ note: 'C4', duration: 'quarter' },
+		{ note: 'D4', duration: 'quarter' },
+		{ note: 'E4', duration: 'quarter' },
+		{ note: 'F4', duration: 'quarter' },
 		{ note: 'G4', duration: 'quarter' }
 	];
 
+	const pos = (pos = 0) => {
+		const position = typeof pos === 'string' ? NOTES[pos] || 0 : pos;
+		const base = radius * 4.5;
+		const halfPos = position / 2;
+		const invertPos = -halfPos;
+		const clefCPositionAdjustment = invertPos + -CLEF.cPosition / 2;
+
+		return base + radius * clefCPositionAdjustment;
+	};
+
 	// Function to draw the staff
 	function drawStaff() {
+		const keySigPosition = radius + radius * 3;
+		const gapForKeySig = radius * KEY_SIGNATURE.sharps;
+		const timeSigPosition = keySigPosition + gapForKeySig + radius;
+
+		const entities = (group) => ({
+			staffLine: (i) => {
+				group
+					.append('line')
+					.attr('x1', 0)
+					.attr('y1', i * radius)
+					.attr('x2', effectiveWidth)
+					.attr('y2', i * radius)
+					.attr('stroke', config.staffLineColor)
+					.attr('stroke-width', config.staffLineWidth);
+			},
+			barLine: (pos) => {
+				group
+					.append('line')
+					.attr('x1', pos)
+					.attr('y1', 0)
+					.attr('x2', pos)
+					.attr('y2', (config.staffLines - 1) * radius)
+					.attr('stroke', config.staffLineColor)
+					.attr('stroke-width', config.barLineWidth);
+			},
+			clef: () => {
+				group
+					.append('text')
+					.attr('x', radius * 2)
+					.attr('y', radius * 3)
+					.attr('text-anchor', 'middle')
+					.attr('class', 'smuFL-symbol clef-symbol')
+					.style('font-size', `${scaledFontSize}px`)
+					.text('\uE050'); // Treble clef symbol in smuFL-symbol
+			},
+			timeSignature: () => {
+				// Add text for time signature using Bravura font - position relative to radius
+				staffGroup
+					.append('text')
+					.attr('x', timeSigPosition)
+					.attr('y', radius * 1)
+					.attr('text-anchor', 'middle')
+					.attr('class', 'smuFL-symbol')
+					.style('font-size', `${scaledFontSize}px`)
+					.text('\uE084'); // 4 in smuFL-symbol
+
+				staffGroup
+					.append('text')
+					.attr('x', timeSigPosition)
+					.attr('y', radius * 3)
+					.attr('text-anchor', 'middle')
+					.attr('class', 'smuFL-symbol')
+					.style('font-size', `${scaledFontSize}px`)
+					.text('\uE084'); // 4 in smuFL-symbol
+			},
+			sharp: (i, p) => {
+				console.log(p);
+				staffGroup
+					.append('text')
+					.attr('x', keySigPosition + i * radius)
+					.attr('y', pos(p))
+					.attr('text-anchor', 'middle')
+					.attr('class', 'smuFL-symbol')
+					.style('font-size', `${scaledFontSize}px`)
+					.text('\uE262'); // Sharp symbol in smuFL-symbol
+			},
+			note: ({ duration, direction, position, note }) => {
+				// Draw a single note - position relative to radius
+				staffGroup
+					.append('text')
+					.attr('x', timeSigPosition + keySigPosition + radius * position)
+					.attr('y', pos(note))
+					.attr('text-anchor', 'middle')
+					.attr('class', 'smuFL-symbol note')
+					.style('font-size', `${scaledFontSize}px`)
+					.text(
+						String.fromCodePoint(parseInt(NOTE[direction][duration].code.replace('U+', ''), 16))
+					);
+			}
+		});
+
 		// Clear any existing SVG
 		d3.select('#staff-container').select('svg').remove();
 
@@ -108,91 +239,29 @@
 			.append('g')
 			.attr('transform', `translate(${config.margin.left}, ${config.margin.top})`);
 
+		const draw = entities(staffGroup);
+
 		// Calculate effective width and height
 		const effectiveWidth = config.width - config.margin.left - config.margin.right;
-		const effectiveHeight = config.height - config.margin.top - config.margin.bottom;
 
 		// Draw the staff lines
 		for (let i = 0; i < config.staffLines; i++) {
-			staffGroup
-				.append('line')
-				.attr('x1', 0)
-				.attr('y1', i * radius)
-				.attr('x2', effectiveWidth)
-				.attr('y2', i * radius)
-				.attr('stroke', config.staffLineColor)
-				.attr('stroke-width', config.staffLineWidth);
+			draw.staffLine(i);
 		}
 
-		// Draw bar lines at the beginning and end
-		staffGroup
-			.append('line')
-			.attr('x1', 0)
-			.attr('y1', 0)
-			.attr('x2', 0)
-			.attr('y2', (config.staffLines - 1) * radius)
-			.attr('stroke', config.staffLineColor)
-			.attr('stroke-width', config.barLineWidth);
+		draw.barLine(effectiveWidth);
+		draw.clef();
+		draw.timeSignature();
 
-		staffGroup
-			.append('line')
-			.attr('x1', effectiveWidth)
-			.attr('y1', 0)
-			.attr('x2', effectiveWidth)
-			.attr('y2', (config.staffLines - 1) * radius)
-			.attr('stroke', config.staffLineColor)
-			.attr('stroke-width', config.barLineWidth);
-
-		// Add text for clef using Bravura font - position relative to radius
-		staffGroup
-			.append('text')
-			.attr('x', radius * 2)
-			.attr('y', radius * 3)
-			.attr('text-anchor', 'middle')
-			.attr('class', 'smuFL-symbol clef-symbol')
-			.style('font-size', `${scaledFontSize}px`)
-			.text('\uE050'); // Treble clef symbol in smuFL-symbol
-
-		// Add text for time signature using Bravura font - position relative to radius
-		staffGroup
-			.append('text')
-			.attr('x', radius * 5)
-			.attr('y', radius)
-			.attr('text-anchor', 'middle')
-			.attr('class', 'smuFL-symbol time-signature')
-			.style('font-size', `${scaledFontSize}px`)
-			.text('\uE084'); // 4 in smuFL-symbol
-
-		staffGroup
-			.append('text')
-			.attr('x', radius * 5)
-			.attr('y', radius * 3)
-			.attr('text-anchor', 'middle')
-			.attr('class', 'smuFL-symbol time-signature')
-			.style('font-size', `${scaledFontSize}px`)
-			.text('\uE084'); // 4 in smuFL-symbol
-
-		// Draw a single note - position relative to radius
-		staffGroup
-			.append('circle')
-			.attr('cx', radius * 20)
-			.attr('cy', radius * 1.5)
-			.attr('r', radius / 2)
-			.attr('fill', 'black')
-			.attr('class', 'note');
+		barData.forEach((note, index) => {
+			draw.note({ duration: note.duration, direction: 'up', position: index, note: note.note });
+		});
 
 		// Placeholder for key signature (sharps) - position relative to radius
 		if (KEY_SIGNATURE.sharps > 0) {
 			for (let i = 0; i < KEY_SIGNATURE.sharps; i++) {
-				const position = CLEF.mapping[i % 7] - 1;
-				staffGroup
-					.append('text')
-					.attr('x', radius * 7 + i * radius * 1.5)
-					.attr('y', radius * 2.5 - (position * radius) / 2)
-					.attr('text-anchor', 'middle')
-					.attr('class', 'smuFL-symbol key-signature')
-					.style('font-size', `${scaledFontSize}px`)
-					.text('\uE262'); // Sharp symbol in smuFL-symbol
+				const position = CLEF.accidentals[i];
+				draw.sharp(i, position);
 			}
 		}
 	}
@@ -222,7 +291,7 @@
 	<div id="staff-container">
 		<!-- These span elements are used to reference the classes used by D3 -->
 		<span class="smuFL-symbol clef-symbol" style="display: none;"></span>
-		<span class="smuFL-symbol time-signature" style="display: none;"></span>
+		<span class="smuFL-symbol" style="display: none;"></span>
 		<span class="smuFL-symbol key-signature" style="display: none;"></span>
 	</div>
 
