@@ -171,12 +171,13 @@
 
 				group
 					.append('line')
+					.attr('class', 'bar-line')
 					.attr('x1', xPos)
 					.attr('x2', xPos)
 					.attr('y1', yStart)
 					.attr('y2', yStart + staffHeight)
-					.attr('stroke', config.staffLineColor)
-					.attr('stroke-width', isSystemBoundary ? config.barLineWidth : 1);
+					.attr('stroke', 'black')
+					.attr('stroke-width', isSystemBoundary ? 2 : 1.5);
 			},
 			clef: (system: number) => {
 				const yStart = config.margin.top + system * (staffHeight + config.systemMarginTop);
@@ -304,20 +305,55 @@
 			}
 		});
 
-		const draw = entities(staffGroup);
-
 		// Render each system
 		for (let systemIndex = 0; systemIndex < systemCount; systemIndex++) {
-			// Draw staff lines
-			for (let lineIndex = 0; lineIndex < config.staffLines; lineIndex++) {
-				draw.staffLine(systemIndex, lineIndex);
+			// Create a system group
+			const systemGroup = staffGroup.append('g').attr('class', `system-${systemIndex}`);
+			const draw = entities(systemGroup);
+
+			// Calculate the exact position of the last bar line in this system
+			const barsInSystem = Math.min(barsPerSystem, barCount - systemIndex * barsPerSystem);
+			let lastBarXPos = config.margin.left;
+
+			if (barsInSystem === 0) {
+				// If no bars in system, just the initial bar line
+				lastBarXPos = config.margin.left;
+			} else if (barsInSystem === 1) {
+				// If just one bar, end at firstBarWidth
+				lastBarXPos = config.margin.left + firstBarWidth;
+			} else {
+				// Multiple bars
+				lastBarXPos = config.margin.left + firstBarWidth + (barsInSystem - 1) * regularBarWidth;
 			}
 
-			// Draw bar lines
-			const barsInSystem = Math.min(barsPerSystem, barCount - systemIndex * barsPerSystem);
-			for (let barIndex = 0; barIndex <= barsInSystem; barIndex++) {
-				const isSystemBoundary = barIndex === 0 || barIndex === barsInSystem;
-				draw.barLine(systemIndex, barIndex, isSystemBoundary);
+			// Draw staff lines ending exactly at the last bar line
+			for (let lineIndex = 0; lineIndex < config.staffLines; lineIndex++) {
+				const yStart = config.margin.top + systemIndex * (staffHeight + config.systemMarginTop);
+				const yPosition = yStart + lineIndex * radius;
+
+				systemGroup
+					.append('line')
+					.attr('class', 'staff-line')
+					.attr('x1', config.margin.left)
+					.attr('x2', lastBarXPos)
+					.attr('y1', yPosition)
+					.attr('y2', yPosition)
+					.attr('stroke', config.staffLineColor)
+					.attr('stroke-width', config.staffLineWidth);
+			}
+
+			// Draw bar lines - only draw up to the last bar, not one extra
+			// First bar line
+			draw.barLine(systemIndex, 0, true);
+
+			// Middle bar lines
+			for (let barIndex = 1; barIndex < barsInSystem; barIndex++) {
+				draw.barLine(systemIndex, barIndex, false);
+			}
+
+			// Last bar line (if there are bars in the system)
+			if (barsInSystem > 0) {
+				draw.barLine(systemIndex, barsInSystem, true);
 			}
 
 			// Draw clef
