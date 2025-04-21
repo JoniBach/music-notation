@@ -1,7 +1,4 @@
 <script>
-	import { onMount } from 'svelte';
-	import * as d3 from 'd3';
-
 	const CLEF_IDS = [
 		'treble',
 		'bass',
@@ -289,177 +286,6 @@
 	let note = 'double';
 	let direction = 'down';
 	let rest = false;
-
-	// D3 staff rendering variables
-	let staffSvg;
-	let staffWidth = 600;
-	let staffHeight = 200;
-	let margins = { top: 30, right: 30, bottom: 30, left: 50 };
-	let lineSpacing = 10; // Distance between staff lines
-	let barWidth = staffWidth - margins.left - margins.right;
-	let measureCount = 4; // Number of measures in the staff
-	let measureWidth = barWidth / measureCount;
-
-	// Render the staff when the component mounts
-	onMount(() => {
-		renderStaff();
-	});
-
-	// Function to render the staff with D3
-	function renderStaff() {
-		if (!staffSvg) return;
-
-		// Clear any existing content
-		d3.select(staffSvg).selectAll('*').remove();
-
-		// Create the SVG
-		const svg = d3
-			.select(staffSvg)
-			.attr('width', staffWidth)
-			.attr('height', staffHeight)
-			.attr('viewBox', `0 0 ${staffWidth} ${staffHeight}`);
-
-		// Draw staff group with margins
-		const staff = svg.append('g').attr('transform', `translate(${margins.left}, ${margins.top})`);
-
-		// Draw the 5 horizontal staff lines
-		for (let i = 0; i < 5; i++) {
-			staff
-				.append('line')
-				.attr('x1', 0)
-				.attr('y1', i * lineSpacing)
-				.attr('x2', barWidth)
-				.attr('y2', i * lineSpacing)
-				.attr('stroke', 'black')
-				.attr('stroke-width', 1);
-		}
-
-		// Draw measure bars (vertical lines)
-		for (let i = 0; i <= measureCount; i++) {
-			const x = i * measureWidth;
-			// Make first and last bar lines thicker for double bars
-			const strokeWidth = i === 0 || i === measureCount ? 2 : 1;
-
-			staff
-				.append('line')
-				.attr('x1', x)
-				.attr('y1', 0)
-				.attr('x2', x)
-				.attr('y2', (5 - 1) * lineSpacing) // Height of staff (5 lines - 1 spacing)
-				.attr('stroke', 'black')
-				.attr('stroke-width', strokeWidth);
-		}
-
-		// Place clef at the beginning
-		const clefG = staff.append('g').attr('transform', `translate(10, ${lineSpacing * 2})`);
-
-		clefG
-			.append('text')
-			.attr('class', 'music-symbol')
-			.attr('font-family', 'Bravura')
-			.attr('font-size', '40')
-			.attr('text-anchor', 'middle')
-			.attr('dominant-baseline', 'middle')
-			.text(() => {
-				// Convert Unicode code point to character
-				return String.fromCodePoint(parseInt(CLEF[clef].code.replace('U+', ''), 16));
-			});
-
-		// Add key signature if not C major/A minor
-		if (keySignature !== 'c_major_a_minor') {
-			const keySigG = staff.append('g').attr('transform', `translate(40, ${lineSpacing * 2})`);
-
-			if (KEY_SIGNATURE[keySignature].sharps > 0) {
-				for (let i = 0; i < KEY_SIGNATURE[keySignature].sharps; i++) {
-					keySigG
-						.append('text')
-						.attr('class', 'music-symbol')
-						.attr('font-family', 'Bravura')
-						.attr('font-size', '30')
-						.attr('x', i * 15)
-						.attr('text-anchor', 'middle')
-						.attr('dominant-baseline', 'middle')
-						.text(String.fromCodePoint(parseInt(ACCIDENTAL.sharp.code.replace('U+', ''), 16)));
-				}
-			} else if (KEY_SIGNATURE[keySignature].flats > 0) {
-				for (let i = 0; i < KEY_SIGNATURE[keySignature].flats; i++) {
-					keySigG
-						.append('text')
-						.attr('class', 'music-symbol')
-						.attr('font-family', 'Bravura')
-						.attr('font-size', '30')
-						.attr('x', i * 15)
-						.attr('text-anchor', 'middle')
-						.attr('dominant-baseline', 'middle')
-						.text(String.fromCodePoint(parseInt(ACCIDENTAL.flat.code.replace('U+', ''), 16)));
-				}
-			}
-		}
-
-		// Add time signature
-		const timeSigX = keySignature === 'c_major_a_minor' ? 60 : 80;
-		const timeSigG = staff
-			.append('g')
-			.attr('transform', `translate(${timeSigX}, ${lineSpacing * 2})`);
-
-		if (timeSignature === '4_4_common_time') {
-			timeSigG
-				.append('text')
-				.attr('class', 'music-symbol')
-				.attr('font-family', 'Bravura')
-				.attr('font-size', '30')
-				.attr('text-anchor', 'middle')
-				.attr('dominant-baseline', 'middle')
-				.text('𝄴'); // Common time symbol
-		} else if (timeSignature === '2_2_cut_time') {
-			timeSigG
-				.append('text')
-				.attr('class', 'music-symbol')
-				.attr('font-family', 'Bravura')
-				.attr('font-size', '30')
-				.attr('text-anchor', 'middle')
-				.attr('dominant-baseline', 'middle')
-				.text('𝄵'); // Cut time symbol
-		} else {
-			// Regular time signature
-			const numerator = TIME_SIGNATURE[timeSignature].numerator;
-			const denominator = TIME_SIGNATURE[timeSignature].denominator;
-
-			timeSigG
-				.append('text')
-				.attr('class', 'music-symbol')
-				.attr('font-family', 'Bravura')
-				.attr('font-size', '20')
-				.attr('text-anchor', 'middle')
-				.attr('dominant-baseline', 'middle')
-				.attr('y', -10)
-				.text(
-					String.fromCodePoint(
-						parseInt(TIME_SIGNATURE[timeSignature].numeratorCode.replace('U+', ''), 16)
-					)
-				);
-
-			timeSigG
-				.append('text')
-				.attr('class', 'music-symbol')
-				.attr('font-family', 'Bravura')
-				.attr('font-size', '20')
-				.attr('text-anchor', 'middle')
-				.attr('dominant-baseline', 'middle')
-				.attr('y', 10)
-				.text(
-					String.fromCodePoint(
-						parseInt(TIME_SIGNATURE[timeSignature].denominatorCode.replace('U+', ''), 16)
-					)
-				);
-		}
-	}
-
-	// Update the staff when these properties change
-	$: {
-		clef, keySignature, timeSignature;
-		if (staffSvg) renderStaff();
-	}
 </script>
 
 <div class="interface">
@@ -592,24 +418,6 @@
 	</div>
 </div>
 
-<!-- D3 Musical Staff -->
-<div class="interface">
-	<h3>Musical Staff (D3.js)</h3>
-	<p>Below is a musical staff with {measureCount} measures.</p>
-
-	<div class="staff-controls">
-		<label>
-			Measures:
-			<input type="range" bind:value={measureCount} min="1" max="8" step="1" />
-			{measureCount}
-		</label>
-	</div>
-
-	<div class="staff-container">
-		<svg bind:this={staffSvg}></svg>
-	</div>
-</div>
-
 <style>
 	.interface {
 		border: 1px solid #ccc;
@@ -648,15 +456,5 @@
 	.numerator,
 	.denominator {
 		display: block;
-	}
-	.staff-container {
-		margin-top: 1rem;
-		overflow-x: auto;
-	}
-	.staff-controls {
-		margin-bottom: 1rem;
-	}
-	.music-symbol {
-		font-family: 'Bravura', serif;
 	}
 </style>
