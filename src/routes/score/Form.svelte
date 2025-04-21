@@ -20,7 +20,8 @@
 		note = $bindable(),
 		direction = $bindable(),
 		rest = $bindable(),
-		barCount = $bindable()
+		barCount = $bindable(),
+		radius = $bindable()
 	} = $props();
 </script>
 
@@ -102,6 +103,11 @@
 		Bars: <input type="range" min="1" max="24" bind:value={barCount} />
 		{barCount}
 	</label>
+	<label>
+		Radius: <input type="range" min="5" max="15" bind:value={radius} />
+		{radius}
+	</label>
+
 	<hr />
 	<p class="headder">
 		Tool <span class="symbol">

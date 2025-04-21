@@ -26,10 +26,10 @@
 	];
 
 	export const CLEF = {
-		treble: { root: 'G', code: 'U+E050', description: 'G clef', name: 'Treble', offset:0 },
-		bass: { root: 'F', code: 'U+E062', description: 'F clef', name: 'Bass', offset:0 },
-		alto: { root: 'C', code: 'U+E05C', description: 'C clef', name: 'Alto', offset:0 },
-		tenor: { root: 'C', code: 'U+E05C', description: 'C clef', name: 'Tenor', offset:0 }
+		treble: { root: 'G', code: 'U+E050', description: 'G clef', name: 'Treble', offset:-1 },
+		bass: { root: 'F', code: 'U+E062', description: 'F clef', name: 'Bass', offset:3 },
+		alto: { root: 'C', code: 'U+E05C', description: 'C clef', name: 'Alto', offset:1 },
+		tenor: { root: 'C', code: 'U+E05C', description: 'C clef', name: 'Tenor', offset:3 }
 	};
 
 	export const TIME_SIGNATURE = {
@@ -276,3 +276,31 @@
 	export const DIRECTION_IDS = ['down', 'up'];
 
 	export const NOTE_IDS = ['double', 'whole', 'half', 'quarter', 'eighth', 'sixteenth'];
+
+	export const NOTES = {
+		C3: -7,
+		D3: -6,
+		E3: -5,
+		F3: -4,
+		G3: -3,
+		A3: -2,
+		B3: -1,
+		C4: 0,
+		D4: 1,
+		E4: 2,
+		F4: 3,
+		G4: 4,
+		A4: 5,
+		B4: 6,
+		C5: 7,
+		D5: 8,
+		E5: 9,
+		F5: 10,
+		G5: 11,
+		A5: 12,
+		B5: 13
+	};
+
+    	// Staff positions for sharps and flats in treble clef
+	export const SHARP_POSITIONS = [5, 2, 6, 3, 0, 4, 1]; // F#, C#, G#, D#, A#, E#, B#
+	export const FLAT_POSITIONS = [3, 6, 2, 5, 1, 4, 0]; // Bb, Eb, Ab, Db, Gb, Cb, Fb
