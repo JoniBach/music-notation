@@ -368,7 +368,12 @@
 			}
 
 			// Example note rendering - this would be where you'd add actual notes
-			// draw.note(systemIndex, 0, { note: 'C4', duration: 'quarter', direction: 'down', position: 0.5 });
+			// draw.note(systemIndex, 0, {
+			// 	note: 'C4',
+			// 	duration: 'quarter',
+			// 	direction: 'down',
+			// 	position: 0.5
+			// });
 		}
 	}
 </script>
