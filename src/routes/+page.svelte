@@ -7,6 +7,7 @@
 	<a href="/config">Config</a>
 	<a href="/bar">Bar</a>
 	<a href="/staff">Staff</a>
+	<a href="/score">Score</a>
 </div>
 
 <style>
