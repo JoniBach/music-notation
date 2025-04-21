@@ -30,9 +30,9 @@
 
 	// Key Signature definitions
 	// Staff positions for sharps in treble clef (F#, C#, G#, D#, A#, E#, B#)
-	const SHARP_POSITIONS = [5, 2, 6, 3, 7, 4, 1];
+	const SHARP_POSITIONS = [5, 2, 6, 3, 0, 4, 1];
 	// Staff positions for flats in treble clef (Bb, Eb, Ab, Db, Gb, Cb, Fb)
-	const FLAT_POSITIONS = [3, 6, 2, 5, 1, 4, 7];
+	const FLAT_POSITIONS = [3, 6, 2, 5, 1, 4, 0];
 
 	// Key signature definitions - mapping names to number of accidentals
 	const KEY_SIGNATURES = [
