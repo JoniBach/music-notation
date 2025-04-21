@@ -195,7 +195,7 @@
 			timeSignature: (system: number) => {
 				const yStart = config.margin.top + system * (staffHeight + config.systemMarginTop);
 				// Position time signature after key signature
-				const baseXPos = config.margin.left + radius * 7; // Base position after clef
+				const baseXPos = config.margin.left + radius * 5; // Base position after clef
 				// Add space for key signature accidentals
 				const keySigWidth =
 					Math.max(currentKeySignature.sharps, currentKeySignature.flats) * radius;
@@ -207,7 +207,7 @@
 					.append('text')
 					.attr('class', 'time-signature-numerator')
 					.attr('x', xPosition)
-					.attr('y', yStart + radius)
+					.attr('y', yStart + radius * 0.5)
 					.attr('text-anchor', 'middle')
 					.attr('class', 'smuFL-symbol')
 					.style('font-size', `${scaledFontSize}px`)
@@ -220,7 +220,7 @@
 					.append('text')
 					.attr('class', 'time-signature-denominator')
 					.attr('x', xPosition)
-					.attr('y', yStart + radius * 3)
+					.attr('y', yStart + radius * 2.5)
 					.attr('text-anchor', 'middle')
 					.attr('class', 'smuFL-symbol')
 					.style('font-size', `${scaledFontSize}px`)
@@ -232,7 +232,7 @@
 			},
 			keySignature: (system: number) => {
 				const yStart = config.margin.top + system * (staffHeight + config.systemMarginTop);
-				const baseXPos = config.margin.left + radius * 7; // After clef
+				const baseXPos = config.margin.left + radius * 5; // Reduced from 7 to bring closer to clef
 
 				// Draw sharps or flats based on key signature
 				if (currentKeySignature.sharps > 0) {
