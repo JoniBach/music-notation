@@ -19,7 +19,8 @@
 		clef = $bindable(),
 		note = $bindable(),
 		direction = $bindable(),
-		rest = $bindable()
+		rest = $bindable(),
+		barCount = $bindable()
 	} = $props();
 </script>
 
@@ -97,6 +98,10 @@
 			{/each}
 		</select>
 	</div>
+	<label>
+		Bars: <input type="range" min="1" max="24" bind:value={barCount} />
+		{barCount}
+	</label>
 	<hr />
 	<p class="headder">
 		Tool <span class="symbol">
