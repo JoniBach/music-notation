@@ -402,24 +402,11 @@
 	}
 
 	.staff-container {
-		flex-grow: 1;
 		overflow: auto;
-		padding: 20px;
 	}
 
 	:global(.smuFL-symbol) {
 		font-family: 'Bravura', serif;
 		dominant-baseline: middle;
-	}
-
-	.controls {
-		position: fixed;
-		bottom: 10px;
-		right: 10px;
-		background: white;
-		padding: 10px;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 	}
 </style>
