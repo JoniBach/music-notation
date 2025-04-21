@@ -31,7 +31,6 @@
 
 	// --- CONFIGURATION ---
 	const config = {
-		margin: { top: 40, right: 20, bottom: 40, left: 60 },
 		staffLines: 5,
 		staffLineColor: '#000',
 		staffLineWidth: 1,
@@ -42,7 +41,7 @@
 	// --- STATE ---
 	let container: HTMLDivElement;
 	let svg: any = null;
-	let SVG_WIDTH = 800;
+	let SVG_WIDTH = 400;
 
 	// --- DERIVED VALUES ---
 	// Calculate the extra width needed for the first bar based on key signature
@@ -51,19 +50,27 @@
 	$: currentTimeSignature = TIME_SIGNATURE[timeSignature];
 	$: accidentalsCount = Math.max(currentKeySignature.sharps, currentKeySignature.flats);
 
-	// Dynamic bar widths based on radius
-	$: baseBarsWidth = SVG_WIDTH - config.margin.left - config.margin.right;
-	$: firstBarExtraWidth = radius * (4 + accidentalsCount);
-	$: minBarWidth = radius * 12;
-	$: barsPerSystem = Math.max(1, Math.floor((baseBarsWidth - firstBarExtraWidth) / minBarWidth));
+	// Simplified bar width calculations without using margins
+	$: padding = radius * 2; // Basic padding for layout
+	$: startPadding = 0;
+	$: endPadding = 0;
+	$: verticalPadding = padding * 2;
+
+	// Calculate how many bars can fit per system with the available width
+	$: firstBarExtraWidth = radius * (4 + accidentalsCount); // Space for clef, key signature, etc.
+	$: minBarWidth = radius * 12; // Minimum width per bar
+	$: availableWidth = SVG_WIDTH - startPadding - endPadding;
+	$: barsPerSystem = Math.max(1, Math.floor((availableWidth - firstBarExtraWidth) / minBarWidth));
 	$: systemCount = Math.ceil(barCount / barsPerSystem);
-	$: regularBarWidth = (baseBarsWidth - firstBarExtraWidth) / Math.max(barsPerSystem - 1, 1);
-	$: firstBarWidth = regularBarWidth + firstBarExtraWidth;
+
+	// Calculate even bar widths
+	$: regularBarWidth =
+		barsPerSystem > 1 ? (availableWidth - firstBarExtraWidth) / barsPerSystem : minBarWidth;
+	$: firstBarWidth = firstBarExtraWidth + (barsPerSystem > 1 ? regularBarWidth : availableWidth);
 
 	// Staff positions based on radius
 	$: staffHeight = (config.staffLines - 1) * radius;
-	$: TOTAL_HEIGHT =
-		config.margin.top + config.margin.bottom + systemCount * (staffHeight + config.systemMarginTop);
+	$: TOTAL_HEIGHT = verticalPadding * 2 + systemCount * (staffHeight + config.systemMarginTop);
 
 	// --- LIFECYCLE HANDLERS ---
 	onMount(() => {
@@ -144,21 +151,21 @@
 		// Create entities factory for drawing elements
 		const entities = (group: any) => ({
 			staffLine: (system: number, line: number) => {
-				const yStart = config.margin.top + system * (staffHeight + config.systemMarginTop);
+				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
 				const yPosition = yStart + line * radius;
 
 				group
 					.append('line')
-					.attr('x1', config.margin.left)
-					.attr('x2', SVG_WIDTH - config.margin.right)
+					.attr('x1', startPadding)
+					.attr('x2', SVG_WIDTH - endPadding)
 					.attr('y1', yPosition)
 					.attr('y2', yPosition)
 					.attr('stroke', config.staffLineColor)
 					.attr('stroke-width', config.staffLineWidth);
 			},
 			barLine: (system: number, barIndex: number, isSystemBoundary = false) => {
-				const yStart = config.margin.top + system * (staffHeight + config.systemMarginTop);
-				let xPos = config.margin.left;
+				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+				let xPos = startPadding;
 
 				if (barIndex === 1) {
 					xPos += firstBarWidth;
@@ -167,7 +174,7 @@
 				}
 
 				// Ensure position doesn't exceed width
-				xPos = Math.min(xPos, SVG_WIDTH - config.margin.right);
+				xPos = Math.min(xPos, SVG_WIDTH - endPadding);
 
 				group
 					.append('line')
@@ -180,13 +187,13 @@
 					.attr('stroke-width', isSystemBoundary ? 2 : 1.5);
 			},
 			clef: (system: number) => {
-				const yStart = config.margin.top + system * (staffHeight + config.systemMarginTop);
+				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
 				const yPosition = yStart + calculateStaffPosition(currentClef.offset);
 
 				group
 					.append('text')
 					.attr('class', 'clef')
-					.attr('x', config.margin.left + radius * 2)
+					.attr('x', startPadding + radius * 2)
 					.attr('y', yPosition)
 					.attr('text-anchor', 'middle')
 					.attr('class', 'smuFL-symbol')
@@ -194,9 +201,9 @@
 					.text(String.fromCodePoint(parseInt(currentClef.code.replace('U+', ''), 16)));
 			},
 			timeSignature: (system: number) => {
-				const yStart = config.margin.top + system * (staffHeight + config.systemMarginTop);
+				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
 				// Position time signature after key signature
-				const baseXPos = config.margin.left + radius * 5; // Base position after clef
+				const baseXPos = startPadding + radius * 5; // Base position after clef
 				// Add space for key signature accidentals
 				const keySigWidth =
 					Math.max(currentKeySignature.sharps, currentKeySignature.flats) * radius;
@@ -232,8 +239,8 @@
 					);
 			},
 			keySignature: (system: number) => {
-				const yStart = config.margin.top + system * (staffHeight + config.systemMarginTop);
-				const baseXPos = config.margin.left + radius * 5; // Reduced from 7 to bring closer to clef
+				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+				const baseXPos = startPadding + radius * 5; // Reduced from 7 to bring closer to clef
 
 				// Draw sharps or flats based on key signature
 				if (currentKeySignature.sharps > 0) {
@@ -271,10 +278,10 @@
 				}
 			},
 			note: (system: number, barIndex: number, noteData: NoteData) => {
-				const yStart = config.margin.top + system * (staffHeight + config.systemMarginTop);
+				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
 
 				// Calculate x position based on bar position
-				let barStartX = config.margin.left;
+				let barStartX = startPadding;
 				if (barIndex > 0) {
 					barStartX += firstBarWidth + (barIndex - 1) * regularBarWidth;
 				}
@@ -311,31 +318,45 @@
 			const systemGroup = staffGroup.append('g').attr('class', `system-${systemIndex}`);
 			const draw = entities(systemGroup);
 
+			// Calculate which bars belong to this system
+			const startBarIndex = systemIndex * barsPerSystem;
+			const endBarIndex = Math.min(startBarIndex + barsPerSystem, barCount);
+			const barsInSystem = endBarIndex - startBarIndex;
+
 			// Calculate the exact position of the last bar line in this system
-			const barsInSystem = Math.min(barsPerSystem, barCount - systemIndex * barsPerSystem);
-			let lastBarXPos = config.margin.left;
+			let lastBarXPos = startPadding;
 
 			if (barsInSystem === 0) {
 				// If no bars in system, just the initial bar line
-				lastBarXPos = config.margin.left;
+				lastBarXPos = startPadding;
 			} else if (barsInSystem === 1) {
 				// If just one bar, end at firstBarWidth
-				lastBarXPos = config.margin.left + firstBarWidth;
+				lastBarXPos = startPadding + firstBarWidth;
 			} else {
 				// Multiple bars
-				lastBarXPos = config.margin.left + firstBarWidth + (barsInSystem - 1) * regularBarWidth;
+				lastBarXPos = startPadding + firstBarWidth + (barsInSystem - 1) * regularBarWidth;
 			}
 
-			// Draw staff lines ending exactly at the last bar line
+			// Draw staff lines extending to include all bars with proper spacing
 			for (let lineIndex = 0; lineIndex < config.staffLines; lineIndex++) {
-				const yStart = config.margin.top + systemIndex * (staffHeight + config.systemMarginTop);
+				const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
 				const yPosition = yStart + lineIndex * radius;
+
+				// Calculate the exact end position for staff lines
+				// This ensures the staff lines extend far enough for all bars
+				let staffEndX = startPadding;
+				if (barsInSystem === 1) {
+					staffEndX = startPadding + firstBarWidth + endPadding;
+				} else if (barsInSystem > 1) {
+					staffEndX =
+						startPadding + firstBarWidth + (barsInSystem - 1) * regularBarWidth + endPadding;
+				}
 
 				systemGroup
 					.append('line')
 					.attr('class', 'staff-line')
-					.attr('x1', config.margin.left)
-					.attr('x2', lastBarXPos)
+					.attr('x1', startPadding)
+					.attr('x2', staffEndX)
 					.attr('y1', yPosition)
 					.attr('y2', yPosition)
 					.attr('stroke', config.staffLineColor)
@@ -346,14 +367,11 @@
 			// First bar line
 			draw.barLine(systemIndex, 0, true);
 
-			// Middle bar lines
-			for (let barIndex = 1; barIndex < barsInSystem; barIndex++) {
-				draw.barLine(systemIndex, barIndex, false);
-			}
-
-			// Last bar line (if there are bars in the system)
-			if (barsInSystem > 0) {
-				draw.barLine(systemIndex, barsInSystem, true);
+			// Middle bar lines and ending bar line
+			for (let i = 1; i <= barsInSystem; i++) {
+				// The internal bar index relative to this system
+				const barIndex = i;
+				draw.barLine(systemIndex, barIndex, i === barsInSystem);
 			}
 
 			// Draw clef
@@ -403,6 +421,9 @@
 
 	.staff-container {
 		overflow: auto;
+		flex-grow: 1;
+		width: 100%;
+		padding: 20px;
 	}
 
 	:global(.smuFL-symbol) {
