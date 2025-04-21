@@ -392,8 +392,6 @@
 	<div class="staff-container" id="staff-container" bind:this={container}>
 		<!-- SVG container is appended here by D3 -->
 	</div>
-
-	<div class="controls"></div>
 </div>
 
 <style>
