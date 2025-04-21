@@ -3,6 +3,8 @@
 	import * as d3 from 'd3';
 
 	let fontScale = 40; // Now reactive with binding
+	let radius = 10; // Standard spacing measurement for staff notation
+	$: scaledFontSize = radius * 4; // Scale font size based on radius
 
 	const CLEF = {
 		name: 'Treble',
@@ -10,6 +12,15 @@
 		description: 'G clef',
 		root: 'G',
 		mapping: [6, 3, 7, 4, 1, 5, 2]
+		// 	mapping: {
+		// 	A: 1,
+		// 	B: 2,
+		// 	C: 3,
+		// 	D: 4,
+		// 	E: 5,
+		// 	F: 6,
+		// 	G: 7
+		// }
 	};
 	const TIME_SIGNATURE = {
 		numerator: 4,
@@ -37,7 +48,6 @@
 		height: 160,
 		margin: { top: 40, right: 20, bottom: 40, left: 60 },
 		staffLines: 5,
-		staffLineSpacing: 10,
 		staffLineColor: '#000',
 		staffLineWidth: 1,
 		barLineWidth: 2
@@ -107,9 +117,9 @@
 			staffGroup
 				.append('line')
 				.attr('x1', 0)
-				.attr('y1', i * config.staffLineSpacing)
+				.attr('y1', i * radius)
 				.attr('x2', effectiveWidth)
-				.attr('y2', i * config.staffLineSpacing)
+				.attr('y2', i * radius)
 				.attr('stroke', config.staffLineColor)
 				.attr('stroke-width', config.staffLineWidth);
 		}
@@ -120,7 +130,7 @@
 			.attr('x1', 0)
 			.attr('y1', 0)
 			.attr('x2', 0)
-			.attr('y2', (config.staffLines - 1) * config.staffLineSpacing)
+			.attr('y2', (config.staffLines - 1) * radius)
 			.attr('stroke', config.staffLineColor)
 			.attr('stroke-width', config.barLineWidth);
 
@@ -129,60 +139,68 @@
 			.attr('x1', effectiveWidth)
 			.attr('y1', 0)
 			.attr('x2', effectiveWidth)
-			.attr('y2', (config.staffLines - 1) * config.staffLineSpacing)
+			.attr('y2', (config.staffLines - 1) * radius)
 			.attr('stroke', config.staffLineColor)
 			.attr('stroke-width', config.barLineWidth);
 
-		// Add text for clef using Bravura font
+		// Add text for clef using Bravura font - position relative to radius
 		staffGroup
 			.append('text')
-			.attr('x', 20)
-			.attr('y', 30)
+			.attr('x', radius * 2)
+			.attr('y', radius * 3)
 			.attr('text-anchor', 'middle')
 			.attr('class', 'smuFL-symbol clef-symbol')
-			.style('font-size', `${fontScale}px`)
+			.style('font-size', `${scaledFontSize}px`)
 			.text('\uE050'); // Treble clef symbol in smuFL-symbol
 
-		// Add text for time signature using Bravura font
+		// Add text for time signature using Bravura font - position relative to radius
 		staffGroup
 			.append('text')
-			.attr('x', 50)
-			.attr('y', 10)
+			.attr('x', radius * 5)
+			.attr('y', radius)
 			.attr('text-anchor', 'middle')
 			.attr('class', 'smuFL-symbol time-signature')
-			.style('font-size', `${fontScale}px`)
+			.style('font-size', `${scaledFontSize}px`)
 			.text('\uE084'); // 4 in smuFL-symbol
 
 		staffGroup
 			.append('text')
-			.attr('x', 50)
-			.attr('y', 30)
+			.attr('x', radius * 5)
+			.attr('y', radius * 3)
 			.attr('text-anchor', 'middle')
 			.attr('class', 'smuFL-symbol time-signature')
-			.style('font-size', `${fontScale}px`)
+			.style('font-size', `${scaledFontSize}px`)
 			.text('\uE084'); // 4 in smuFL-symbol
 
-		// Placeholder for key signature (sharps)
+		// Draw a single note - position relative to radius
+		staffGroup
+			.append('circle')
+			.attr('cx', radius * 20)
+			.attr('cy', radius * 1.5)
+			.attr('r', radius / 2)
+			.attr('fill', 'black')
+			.attr('class', 'note');
+
+		// Placeholder for key signature (sharps) - position relative to radius
 		if (KEY_SIGNATURE.sharps > 0) {
-			// const sharpPositions = [0, 1, 2, 3, 4, 5, 6, 7]; // FCGDAEB order on staff
-			// FCGDAEB order on staff
 			for (let i = 0; i < KEY_SIGNATURE.sharps; i++) {
 				const position = CLEF.mapping[i % 7] - 1;
 				staffGroup
 					.append('text')
-					.attr('x', 70 + i * 15)
-					.attr('y', 25 - (position * config.staffLineSpacing) / 2)
+					.attr('x', radius * 7 + i * radius * 1.5)
+					.attr('y', radius * 2.5 - (position * radius) / 2)
 					.attr('text-anchor', 'middle')
 					.attr('class', 'smuFL-symbol key-signature')
-					.style('font-size', `${fontScale * 0.6}px`)
+					.style('font-size', `${scaledFontSize}px`)
 					.text('\uE262'); // Sharp symbol in smuFL-symbol
 			}
 		}
 	}
 
-	// Update the staff when fontScale changes
+	// Update the staff when radius or fontScale changes
 	$: {
 		if (typeof window !== 'undefined') {
+			radius; // reactivity trigger
 			fontScale; // reactivity trigger
 			drawStaff();
 		}
@@ -197,8 +215,8 @@
 	<h1>Music Staff Visualization</h1>
 
 	<div class="controls">
-		<label for="font-scale">Font Scale: {fontScale}px</label>
-		<input type="range" id="font-scale" min="20" max="80" bind:value={fontScale} class="slider" />
+		<label for="note-radius">note head radius: {radius}px</label>
+		<input type="range" id="note-radius" min="5" max="20" bind:value={radius} class="slider" />
 	</div>
 
 	<div id="staff-container">
