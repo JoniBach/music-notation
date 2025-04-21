@@ -238,9 +238,9 @@
 	const ACCIDENTAL_IDS = ['sharp', 'flat', 'natural'];
 
 	const ACCIDENTAL = {
-		sharp: { code: 'U+E262' }, // accidentalSharp
-		flat: { code: 'U+E260' }, // accidentalFlat
-		natural: { code: 'U+E261' } // accidentalNatural
+		sharp: 'U+E262', // accidentalSharp
+		flat: 'U+E260', // accidentalFlat
+		natural: 'U+E261' // accidentalNatural
 	};
 
 	const NOTE = {
@@ -362,11 +362,11 @@
 			<label class="label">Type </label>
 			<div>
 				<label class="label">
-					<input class="input" type="radio" bind:group={rest} value={false} />
+					<input type="radio" bind:group={rest} value={false} />
 					Note
 				</label>
 				<label class="label">
-					<input class="input" type="radio" bind:group={rest} value={true} />
+					<input type="radio" bind:group={rest} value={true} />
 					Rest
 				</label>
 			</div>
@@ -386,6 +386,7 @@
 		height: 100vh;
 		background-color: #f0f0f0;
 		overflow-y: auto;
+		flex-shrink: 0;
 	}
 
 	.score {
@@ -396,9 +397,10 @@
 
 	.input-group {
 		display: flex;
-		flex-direction: column;
+		flex-direction: row;
 		gap: 10px;
 		padding: 10px;
+		align-items: center;
 	}
 
 	.label {
@@ -409,6 +411,7 @@
 		border: 1px solid #ccc;
 		padding: 5px;
 		border-radius: 4px;
+		width: 100%;
 	}
 	.headder {
 		font-weight: bold;
