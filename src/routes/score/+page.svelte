@@ -291,6 +291,8 @@
 	let container: HTMLDivElement;
 	let svg: any = null;
 	let SVG_WIDTH = 400;
+	let ghostNote: any = null; // Reference to the ghost note element
+	let hoverPosition = { x: 0, y: 0, staffPosition: 0, note: 'C4', barIndex: 0 }; // Current hover position
 
 	// --- DERIVED VALUES ---
 	// Calculate the extra width needed for the first bar based on key signature
@@ -332,6 +334,18 @@
 			.attr('width', SVG_WIDTH)
 			.attr('height', TOTAL_HEIGHT);
 
+		// Create a ghost note that follows the cursor
+		ghostNote = svg.append('g').attr('class', 'ghost-note').style('opacity', 0); // Start invisible
+
+		// Add the ghost note circle
+		ghostNote
+			.append('circle')
+			.attr('r', radius / 2)
+			.attr('fill', 'none')
+			.attr('stroke', '#999')
+			.attr('stroke-width', 1)
+			.attr('stroke-dasharray', '3,3');
+
 		handleResize();
 		window.addEventListener('resize', handleResize);
 
@@ -353,10 +367,25 @@
 		// Add event listener for staff clicks - only in browser environment
 		d3.select('#staff-container').on('click', handleStaffClick);
 
+		// Add mousemove event listener to update ghost note position
+		d3.select('#staff-container').on('mousemove', handleMouseMove);
+
+		// Add mouseenter/mouseleave to show/hide ghost note
+		d3.select('#staff-container').on('mouseenter', () => {
+			if (ghostNote) ghostNote.style('opacity', 0.6);
+		});
+
+		d3.select('#staff-container').on('mouseleave', () => {
+			if (ghostNote) ghostNote.style('opacity', 0);
+		});
+
 		return () => {
 			window.removeEventListener('resize', handleResize);
-			// Remove click event listener when component is destroyed
+			// Remove event listeners when component is destroyed
 			d3.select('#staff-container').on('click', null);
+			d3.select('#staff-container').on('mousemove', null);
+			d3.select('#staff-container').on('mouseenter', null);
+			d3.select('#staff-container').on('mouseleave', null);
 		};
 	});
 
@@ -467,6 +496,87 @@
 		// Force update to render the new note
 		scoreNotes = [...scoreNotes];
 		updateStaffLayout();
+	}
+
+	// Function to handle mouse movement to update ghost note position
+	function handleMouseMove(event: MouseEvent): void {
+		if (!svg || !ghostNote) return;
+
+		// Get the mouse coordinates relative to the SVG
+		const svgRect = svg.node().getBoundingClientRect();
+		const x = event.clientX - svgRect.left;
+		const y = event.clientY - svgRect.top;
+
+		// Calculate which system and bar the mouse is over
+		let systemIndex = Math.floor((y - verticalPadding) / (staffHeight + config.systemMarginTop));
+		if (systemIndex < 0 || systemIndex >= systemCount) {
+			// Mouse is not over a valid system
+			ghostNote.style('opacity', 0);
+			return;
+		}
+
+		// Calculate the bar index
+		const startBarIndex = systemIndex * barsPerSystem;
+		const xRelativeToSystem = x - startPadding;
+		let barIndex = startBarIndex;
+
+		if (xRelativeToSystem < 0) {
+			// Mouse is not over a valid bar
+			ghostNote.style('opacity', 0);
+			return;
+		}
+
+		if (xRelativeToSystem < firstBarWidth) {
+			// Mouse is over the first bar of the system
+			barIndex = startBarIndex;
+		} else {
+			// Mouse is over a subsequent bar
+			const barOffset = Math.floor((xRelativeToSystem - firstBarWidth) / regularBarWidth) + 1;
+			barIndex = startBarIndex + barOffset;
+		}
+
+		// Ensure the bar index is valid
+		if (barIndex >= barCount) {
+			ghostNote.style('opacity', 0);
+			return;
+		}
+
+		// Calculate the vertical position on the staff
+		const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
+		const yRelativeToStaff = y - yStart;
+
+		// Convert the y position to a staff position
+		const staffPosition = Math.round((radius * 2 - yRelativeToStaff) / (radius / 2));
+
+		// Find the closest note to the mouse position
+		const noteEntries = Object.entries(NOTES);
+		let closestNote = noteEntries[0];
+		let closestDistance = Math.abs(NOTES[closestNote[0] as keyof typeof NOTES] - staffPosition);
+
+		for (const [noteName, notePosition] of noteEntries) {
+			const distance = Math.abs(notePosition - staffPosition);
+			if (distance < closestDistance) {
+				closestDistance = distance;
+				closestNote = [noteName, notePosition];
+			}
+		}
+
+		const hoveredNote = closestNote[0];
+
+		// Calculate the y position for the ghost note
+		const yPos = yStart + calculateStaffPosition(NOTES[hoveredNote as keyof typeof NOTES], radius);
+
+		// Update hover position state
+		hoverPosition = {
+			x,
+			y: yPos,
+			staffPosition,
+			note: hoveredNote,
+			barIndex
+		};
+
+		// Update ghost note position
+		ghostNote.attr('transform', `translate(${x}, ${yPos})`).style('opacity', 0.6);
 	}
 
 	// --- RENDERING FUNCTIONS ---
@@ -593,9 +703,37 @@
 		// Ensure the bar index is valid
 		if (barIndex >= barCount) return;
 
+		// Calculate the vertical position on the staff to determine the note
+		const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
+		const yRelativeToStaff = y - yStart;
+
+		// Convert the y position to a staff position
+		// Each staff position is half a radius in height
+		const staffPosition = Math.round((radius * 2 - yRelativeToStaff) / (radius / 2));
+
+		// Find the closest note to the clicked position
+		let clickedNote = 'C4'; // Default fallback
+
+		// Convert staff position to note
+		// We need to find the note that corresponds to this staff position
+		const noteEntries = Object.entries(NOTES);
+		let closestNote = noteEntries[0];
+		let closestDistance = Math.abs(NOTES[closestNote[0] as keyof typeof NOTES] - staffPosition);
+
+		for (const [noteName, notePosition] of noteEntries) {
+			const distance = Math.abs(notePosition - staffPosition);
+			if (distance < closestDistance) {
+				closestDistance = distance;
+				closestNote = [noteName, notePosition];
+			}
+		}
+
+		clickedNote = closestNote[0];
+		console.log(`Clicked at staff position ${staffPosition}, adding note ${clickedNote}`);
+
 		// Add a note at the clicked position
 		addNote(barIndex, {
-			note: 'C4', // Default note
+			note: clickedNote, // Use the note determined by the vertical position
 			duration: note, // Use the currently selected note duration
 			direction: direction,
 			rest: rest
