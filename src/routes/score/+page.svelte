@@ -349,8 +349,14 @@
 		addNote(1, { note: 'C4', duration: 'eighth' }); // Third position (auto-calculated)
 		addNote(1, { note: 'D4', duration: 'sixteenth' }); // Fourth position (auto-calculated)
 		addNote(1, { note: 'E4', duration: 'sixteenth' }); // Fourth position (auto-calculated)
+
+		// Add event listener for staff clicks - only in browser environment
+		d3.select('#staff-container').on('click', handleStaffClick);
+
 		return () => {
 			window.removeEventListener('resize', handleResize);
+			// Remove click event listener when component is destroyed
+			d3.select('#staff-container').on('click', null);
 		};
 	});
 
@@ -552,7 +558,7 @@
 	}
 
 	// Add a function to handle clicking on the staff to add notes
-	function handleStaffClick(event) {
+	function handleStaffClick(event: MouseEvent): void {
 		if (!svg) return;
 
 		// Get the click coordinates relative to the SVG
@@ -595,9 +601,6 @@
 			rest: rest
 		});
 	}
-
-	// Add event listener for staff clicks
-	d3.select('#staff-container').on('click', handleStaffClick);
 </script>
 
 <div class="score-container">
