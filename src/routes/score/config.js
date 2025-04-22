@@ -39,6 +39,7 @@
 			description: 'Common time',
 			beatsPerBar: 4,
 			beatUnit: 4,
+			duration: 1,
 			numeratorCode: 'U+E084',
 			denominatorCode: 'U+E084'
 		},
@@ -48,6 +49,7 @@
 			description: 'Waltz time',
 			beatsPerBar: 3,
 			beatUnit: 4,
+			duration: 0.75,
 			numeratorCode: 'U+E083',
 			denominatorCode: 'U+E084'
 		},
@@ -57,6 +59,7 @@
 			description: 'Simple duple',
 			beatsPerBar: 2,
 			beatUnit: 4,
+			duration: 0.5,
 			numeratorCode: 'U+E082',
 			denominatorCode: 'U+E084'
 		},
@@ -66,6 +69,7 @@
 			description: 'Compound duple',
 			beatsPerBar: 6,
 			beatUnit: 8,
+			duration: 0.75,
 			numeratorCode: 'U+E086',
 			denominatorCode: 'U+E088'
 		},
@@ -75,6 +79,7 @@
 			description: 'Cut time',
 			beatsPerBar: 2,
 			beatUnit: 2,
+			duration: 1,
 			numeratorCode: 'U+E082',
 			denominatorCode: 'U+E082'
 		},
@@ -84,6 +89,7 @@
 			description: 'Compound triple',
 			beatsPerBar: 9,
 			beatUnit: 8,
+			duration: 1.5,
 			numeratorCode: 'U+E089',
 			denominatorCode: 'U+E088'
 		}
@@ -237,40 +243,40 @@
 
 	export const NOTE = {
 		down: {
-			double: { name: 'Breave', description: 'Double Note', duration: 8.0, code: 'U+ECA0' },
-			whole: { name: 'Semibreve', description: 'Whole Note', duration: 4.0, code: 'U+ECA2' },
-			half: { name: 'Minim', description: 'Half Note', duration: 2.0, code: 'U+ECA4' },
-			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 1.0, code: 'U+ECA6' },
-			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0.5, code: 'U+ECA8' },
+			double: { name: 'Breave', description: 'Double Note', duration: 2, code: 'U+ECA0' },
+			whole: { name: 'Semibreve', description: 'Whole Note', duration: 1, code: 'U+ECA2' },
+			half: { name: 'Minim', description: 'Half Note', duration: 0.5, code: 'U+ECA4' },
+			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 0.25, code: 'U+ECA6' },
+			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0.125, code: 'U+ECA8' },
 			sixteenth: {
 				name: 'Semiquaver',
 				description: 'Sixteenth Note',
-				duration: 0.25,
+				duration: 0.0625,
 				code: 'U+E1DA'
 			}
 		},
 		up: {
-			double: { name: 'Breave', description: 'Double Note', duration: 8.0, code: 'U+ECA0' },
-			whole: { name: 'Semibreve', description: 'Whole Note', duration: 4.0, code: 'U+ECA2' },
-			half: { name: 'Minim', description: 'Half Note', duration: 2.0, code: 'U+ECA3' },
-			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 1.0, code: 'U+ECA5' },
-			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0.5, code: 'U+ECA7' },
+			double: { name: 'Breave', description: 'Double Note', duration: 2, code: 'U+ECA0' },
+			whole: { name: 'Semibreve', description: 'Whole Note', duration: 1, code: 'U+ECA2' },
+			half: { name: 'Minim', description: 'Half Note', duration: 0.5, code: 'U+ECA3' },
+			quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 0.25, code: 'U+ECA5' },
+			eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0.125, code: 'U+ECA7' },
 			sixteenth: {
 				name: 'Semiquaver',
 				description: 'Sixteenth Note',
-				duration: 0.25,
+				duration: 0.0625,
 				code: 'U+E1D9'
 			}
 		}
 	};
 
 	export const REST = {
-		double: { name: 'Breave', description: 'Double Rest', duration: 0, code: 'U+E4E2' },
-		whole: { name: 'Semibreve', description: 'Whole Rest', duration: 0, code: 'U+E4E3' },
-		half: { name: 'Minim', description: 'Half Rest', duration: 0, code: 'U+E4E4' },
-		quarter: { name: 'Crotchet', description: 'Quarter Rest', duration: 0, code: 'U+E4E5' },
-		eighth: { name: 'Quaver', description: 'Eighth Rest', duration: 0, code: 'U+E4E6' },
-		sixteenth: { name: 'Semiquaver', description: 'Sixteenth Rest', duration: 0, code: 'U+E4E7' }
+		double: { name: 'Breave', description: 'Double Rest', duration: 2, code: 'U+E4E2' },
+		whole: { name: 'Semibreve', description: 'Whole Rest', duration: 1, code: 'U+E4E3' },
+		half: { name: 'Minim', description: 'Half Rest', duration: 0.5, code: 'U+E4E4' },
+		quarter: { name: 'Crotchet', description: 'Quarter Rest', duration: 0.25, code: 'U+E4E5' },
+		eighth: { name: 'Quaver', description: 'Eighth Rest', duration: 0.125, code: 'U+E4E6' },
+		sixteenth: { name: 'Semiquaver', description: 'Sixteenth Rest', duration: 0.0625, code: 'U+E4E7' }
 	};
 
 	export const DIRECTION_IDS = ['down', 'up'];
@@ -278,6 +284,8 @@
 	export const NOTE_IDS = ['double', 'whole', 'half', 'quarter', 'eighth', 'sixteenth'];
 
 	export const NOTES = {
+
+
 		C3: -7,
 		D3: -6,
 		E3: -5,
