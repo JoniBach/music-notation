@@ -139,76 +139,78 @@
 		position?: number;
 	}
 
-	function renderStaff(): void {
-		if (!svg) return;
+	// Create entities factory for drawing elements
+	const entities = (group: any) => ({
+		staffLine: (systemIndex: number, lineIndex: number, barsInSystem: number) => {
+			const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
+			const yPosition = yStart + lineIndex * radius;
 
-		// Clear existing elements
-		svg.selectAll('.staff-element').remove();
+			// Calculate the exact end position for staff lines
+			// This ensures the staff lines extend far enough for all bars
+			let staffEndX = startPadding;
+			if (barsInSystem === 1) {
+				staffEndX = startPadding + firstBarWidth + endPadding;
+			} else if (barsInSystem > 1) {
+				staffEndX =
+					startPadding + firstBarWidth + (barsInSystem - 1) * regularBarWidth + endPadding;
+			}
 
-		// Create a group for all staff elements
-		const staffGroup = svg.append('g').attr('class', 'staff-element');
+			group
+				.append('line')
+				.attr('class', 'staff-line')
+				.attr('x1', startPadding)
+				.attr('x2', staffEndX)
+				.attr('y1', yPosition)
+				.attr('y2', yPosition)
+				.attr('stroke', config.staffLineColor)
+				.attr('stroke-width', config.staffLineWidth);
+		},
+		barLine: (system: number, barIndex: number, isSystemBoundary = false) => {
+			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+			let xPos = startPadding;
 
-		// Create entities factory for drawing elements
-		const entities = (group: any) => ({
-			staffLine: (system: number, line: number) => {
-				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-				const yPosition = yStart + line * radius;
+			if (barIndex === 1) {
+				xPos += firstBarWidth;
+			} else if (barIndex > 1) {
+				xPos += firstBarWidth + (barIndex - 1) * regularBarWidth;
+			}
 
-				group
-					.append('line')
-					.attr('x1', startPadding)
-					.attr('x2', SVG_WIDTH - endPadding)
-					.attr('y1', yPosition)
-					.attr('y2', yPosition)
-					.attr('stroke', config.staffLineColor)
-					.attr('stroke-width', config.staffLineWidth);
-			},
-			barLine: (system: number, barIndex: number, isSystemBoundary = false) => {
-				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-				let xPos = startPadding;
+			// Ensure position doesn't exceed width
+			xPos = Math.min(xPos, SVG_WIDTH - endPadding);
 
-				if (barIndex === 1) {
-					xPos += firstBarWidth;
-				} else if (barIndex > 1) {
-					xPos += firstBarWidth + (barIndex - 1) * regularBarWidth;
-				}
+			group
+				.append('line')
+				.attr('class', 'bar-line')
+				.attr('x1', xPos)
+				.attr('x2', xPos)
+				.attr('y1', yStart)
+				.attr('y2', yStart + staffHeight)
+				.attr('stroke', 'black')
+				.attr('stroke-width', isSystemBoundary ? 2 : 1.5);
+		},
+		clef: (system: number) => {
+			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+			const yPosition = yStart + calculateStaffPosition(currentClef.offset);
 
-				// Ensure position doesn't exceed width
-				xPos = Math.min(xPos, SVG_WIDTH - endPadding);
+			group
+				.append('text')
+				.attr('class', 'clef')
+				.attr('x', startPadding + radius * 2)
+				.attr('y', yPosition)
+				.attr('text-anchor', 'middle')
+				.attr('class', 'smuFL-symbol')
+				.style('font-size', `${scaledFontSize}px`)
+				.text(String.fromCodePoint(parseInt(currentClef.code.replace('U+', ''), 16)));
+		},
+		timeSignature: (system: number) => {
+			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+			// Position time signature after key signature
+			const baseXPos = startPadding + radius * 5; // Base position after clef
+			// Add space for key signature accidentals
+			const keySigWidth = Math.max(currentKeySignature.sharps, currentKeySignature.flats) * radius;
+			const xPosition = baseXPos + keySigWidth + (keySigWidth > 0 ? radius : 0);
 
-				group
-					.append('line')
-					.attr('class', 'bar-line')
-					.attr('x1', xPos)
-					.attr('x2', xPos)
-					.attr('y1', yStart)
-					.attr('y2', yStart + staffHeight)
-					.attr('stroke', 'black')
-					.attr('stroke-width', isSystemBoundary ? 2 : 1.5);
-			},
-			clef: (system: number) => {
-				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-				const yPosition = yStart + calculateStaffPosition(currentClef.offset);
-
-				group
-					.append('text')
-					.attr('class', 'clef')
-					.attr('x', startPadding + radius * 2)
-					.attr('y', yPosition)
-					.attr('text-anchor', 'middle')
-					.attr('class', 'smuFL-symbol')
-					.style('font-size', `${scaledFontSize}px`)
-					.text(String.fromCodePoint(parseInt(currentClef.code.replace('U+', ''), 16)));
-			},
-			timeSignature: (system: number) => {
-				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-				// Position time signature after key signature
-				const baseXPos = startPadding + radius * 5; // Base position after clef
-				// Add space for key signature accidentals
-				const keySigWidth =
-					Math.max(currentKeySignature.sharps, currentKeySignature.flats) * radius;
-				const xPosition = baseXPos + keySigWidth + (keySigWidth > 0 ? radius : 0);
-
+			if (system === 0) {
 				// Always use numeric representation for consistency
 				// Draw numerator
 				group
@@ -237,80 +239,90 @@
 							parseInt(currentTimeSignature.denominatorCode.replace('U+', ''), 16)
 						)
 					);
-			},
-			keySignature: (system: number) => {
-				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-				const baseXPos = startPadding + radius * 5; // Reduced from 7 to bring closer to clef
-
-				// Draw sharps or flats based on key signature
-				if (currentKeySignature.sharps > 0) {
-					for (let i = 0; i < currentKeySignature.sharps; i++) {
-						const position = SHARP_POSITIONS[i];
-						const yPos = yStart + calculateStaffPosition(position);
-						const xPos = baseXPos + i * radius;
-
-						group
-							.append('text')
-							.attr('class', 'key-signature')
-							.attr('x', xPos)
-							.attr('y', yPos)
-							.attr('text-anchor', 'middle')
-							.attr('class', 'smuFL-symbol')
-							.style('font-size', `${scaledFontSize}px`)
-							.text(String.fromCodePoint(parseInt(ACCIDENTAL.sharp.replace('U+', ''), 16))); // Sharp symbol
-					}
-				} else if (currentKeySignature.flats > 0) {
-					for (let i = 0; i < currentKeySignature.flats; i++) {
-						const position = FLAT_POSITIONS[i];
-						const yPos = yStart + calculateStaffPosition(position);
-						const xPos = baseXPos + i * radius;
-
-						group
-							.append('text')
-							.attr('class', 'key-signature')
-							.attr('x', xPos)
-							.attr('y', yPos)
-							.attr('text-anchor', 'middle')
-							.attr('class', 'smuFL-symbol')
-							.style('font-size', `${scaledFontSize}px`)
-							.text(String.fromCodePoint(parseInt(ACCIDENTAL.flat.replace('U+', ''), 16))); // Flat symbol
-					}
-				}
-			},
-			note: (system: number, barIndex: number, noteData: NoteData) => {
-				const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-
-				// Calculate x position based on bar position
-				let barStartX = startPadding;
-				if (barIndex > 0) {
-					barStartX += firstBarWidth + (barIndex - 1) * regularBarWidth;
-				}
-
-				// Position within the bar
-				const xPos = barStartX + (noteData.position || 0.5) * regularBarWidth;
-				const yPos = yStart + calculateStaffPosition(getNotePosition(noteData.note));
-
-				let noteSymbol;
-				if (noteData.rest) {
-					const restCode = REST_CONFIG[noteData.duration]?.code || '';
-					noteSymbol = String.fromCodePoint(parseInt(restCode.replace('U+', ''), 16));
-				} else {
-					const noteDirection = noteData.direction || 'down';
-					const noteCode = NOTE[noteDirection]?.[noteData.duration]?.code || '';
-					noteSymbol = String.fromCodePoint(parseInt(noteCode.replace('U+', ''), 16));
-				}
-
-				group
-					.append('text')
-					.attr('class', 'note')
-					.attr('x', xPos)
-					.attr('y', yPos)
-					.attr('text-anchor', 'middle')
-					.attr('class', 'smuFL-symbol')
-					.style('font-size', `${scaledFontSize}px`)
-					.text(noteSymbol);
 			}
-		});
+		},
+		keySignature: (system: number) => {
+			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+			const baseXPos = startPadding + radius * 5; // Reduced from 7 to bring closer to clef
+
+			// Draw sharps or flats based on key signature
+			if (currentKeySignature.sharps > 0) {
+				for (let i = 0; i < currentKeySignature.sharps; i++) {
+					const position = SHARP_POSITIONS[i];
+					const yPos = yStart + calculateStaffPosition(position);
+					const xPos = baseXPos + i * radius;
+
+					group
+						.append('text')
+						.attr('class', 'key-signature')
+						.attr('x', xPos)
+						.attr('y', yPos)
+						.attr('text-anchor', 'middle')
+						.attr('class', 'smuFL-symbol')
+						.style('font-size', `${scaledFontSize}px`)
+						.text(String.fromCodePoint(parseInt(ACCIDENTAL.sharp.replace('U+', ''), 16))); // Sharp symbol
+				}
+			} else if (currentKeySignature.flats > 0) {
+				for (let i = 0; i < currentKeySignature.flats; i++) {
+					const position = FLAT_POSITIONS[i];
+					const yPos = yStart + calculateStaffPosition(position);
+					const xPos = baseXPos + i * radius;
+
+					group
+						.append('text')
+						.attr('class', 'key-signature')
+						.attr('x', xPos)
+						.attr('y', yPos)
+						.attr('text-anchor', 'middle')
+						.attr('class', 'smuFL-symbol')
+						.style('font-size', `${scaledFontSize}px`)
+						.text(String.fromCodePoint(parseInt(ACCIDENTAL.flat.replace('U+', ''), 16))); // Flat symbol
+				}
+			}
+		},
+		note: (system: number, barIndex: number, noteData: NoteData) => {
+			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+
+			// Calculate x position based on bar position
+			let barStartX = startPadding;
+			if (barIndex > 0) {
+				barStartX += firstBarWidth + (barIndex - 1) * regularBarWidth;
+			}
+
+			// Position within the bar
+			const xPos = barStartX + (noteData.position || 0.5) * regularBarWidth;
+			const yPos = yStart + calculateStaffPosition(getNotePosition(noteData.note));
+
+			let noteSymbol;
+			if (noteData.rest) {
+				const restCode = REST_CONFIG[noteData.duration]?.code || '';
+				noteSymbol = String.fromCodePoint(parseInt(restCode.replace('U+', ''), 16));
+			} else {
+				const noteDirection = noteData.direction || 'down';
+				const noteCode = NOTE[noteDirection]?.[noteData.duration]?.code || '';
+				noteSymbol = String.fromCodePoint(parseInt(noteCode.replace('U+', ''), 16));
+			}
+
+			group
+				.append('text')
+				.attr('class', 'note')
+				.attr('x', xPos)
+				.attr('y', yPos)
+				.attr('text-anchor', 'middle')
+				.attr('class', 'smuFL-symbol')
+				.style('font-size', `${scaledFontSize}px`)
+				.text(noteSymbol);
+		}
+	});
+
+	function renderStaff(): void {
+		if (!svg) return;
+
+		// Clear existing elements
+		svg.selectAll('.staff-element').remove();
+
+		// Create a group for all staff elements
+		const staffGroup = svg.append('g').attr('class', 'staff-element');
 
 		// Render each system
 		for (let systemIndex = 0; systemIndex < systemCount; systemIndex++) {
@@ -323,75 +335,28 @@
 			const endBarIndex = Math.min(startBarIndex + barsPerSystem, barCount);
 			const barsInSystem = endBarIndex - startBarIndex;
 
-			// Calculate the exact position of the last bar line in this system
-			let lastBarXPos = startPadding;
-
-			if (barsInSystem === 0) {
-				// If no bars in system, just the initial bar line
-				lastBarXPos = startPadding;
-			} else if (barsInSystem === 1) {
-				// If just one bar, end at firstBarWidth
-				lastBarXPos = startPadding + firstBarWidth;
-			} else {
-				// Multiple bars
-				lastBarXPos = startPadding + firstBarWidth + (barsInSystem - 1) * regularBarWidth;
-			}
-
-			// Draw staff lines extending to include all bars with proper spacing
-			for (let lineIndex = 0; lineIndex < config.staffLines; lineIndex++) {
-				const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
-				const yPosition = yStart + lineIndex * radius;
-
-				// Calculate the exact end position for staff lines
-				// This ensures the staff lines extend far enough for all bars
-				let staffEndX = startPadding;
-				if (barsInSystem === 1) {
-					staffEndX = startPadding + firstBarWidth + endPadding;
-				} else if (barsInSystem > 1) {
-					staffEndX =
-						startPadding + firstBarWidth + (barsInSystem - 1) * regularBarWidth + endPadding;
-				}
-
-				systemGroup
-					.append('line')
-					.attr('class', 'staff-line')
-					.attr('x1', startPadding)
-					.attr('x2', staffEndX)
-					.attr('y1', yPosition)
-					.attr('y2', yPosition)
-					.attr('stroke', config.staffLineColor)
-					.attr('stroke-width', config.staffLineWidth);
-			}
-
-			// Draw bar lines - only draw up to the last bar, not one extra
-			// First bar line
-			draw.barLine(systemIndex, 0, true);
-
-			// Middle bar lines and ending bar line
-			for (let i = 1; i <= barsInSystem; i++) {
-				// The internal bar index relative to this system
-				const barIndex = i;
-				draw.barLine(systemIndex, barIndex, i === barsInSystem);
-			}
-
-			// Draw clef
+			// clef, key signature, and time signature
 			draw.clef(systemIndex);
-
-			// Draw key signature
 			draw.keySignature(systemIndex);
+			draw.timeSignature(systemIndex);
 
-			// Draw time signature only on the first system
-			if (systemIndex === 0) {
-				draw.timeSignature(systemIndex);
+			// Draw staff lines
+			for (let lineIndex = 0; lineIndex < config.staffLines; lineIndex++) {
+				draw.staffLine(systemIndex, lineIndex, barsInSystem);
+			}
+			// Draw Barlines
+			draw.barLine(systemIndex, 0, true);
+			for (let barIndex = 1; barIndex <= barsInSystem; barIndex++) {
+				draw.barLine(systemIndex, barIndex, barIndex === barsInSystem);
 			}
 
 			// Example note rendering - this would be where you'd add actual notes
-			// draw.note(systemIndex, 0, {
-			// 	note: 'C4',
-			// 	duration: 'quarter',
-			// 	direction: 'down',
-			// 	position: 0.5
-			// });
+			draw.note(systemIndex, 0, {
+				note: 'C4',
+				duration: 'quarter',
+				direction: 'down',
+				position: 0.5
+			});
 		}
 	}
 </script>
@@ -423,7 +388,7 @@
 		overflow: auto;
 		flex-grow: 1;
 		width: 100%;
-		padding: 20px;
+		/* padding: 20px; */
 	}
 
 	:global(.smuFL-symbol) {
