@@ -10,6 +10,19 @@
 	let barCount = 12;
 	let radius = 10; // Base radius unit for staff notation
 
+	// Define note data interface
+	interface NoteData {
+		barIndex: number;
+		note: string;
+		duration: string;
+		direction: string;
+		rest: boolean;
+		position?: number;
+	}
+
+	// Store notes in a structured format
+	let scoreNotes: NoteData[] = [];
+
 	import { onMount } from 'svelte';
 	import * as d3 from 'd3';
 	import { browser } from '$app/environment';
@@ -25,7 +38,219 @@
 		FLAT_POSITIONS,
 		ACCIDENTAL
 	} from './config';
-	import { createFeatures } from './features';
+	// import { createFeatures } from './features';
+
+	// Helper function to calculate vertical position on staff
+	function calculateStaffPosition(position, radius) {
+		// Base position is the middle line (B4)
+		const base = radius * 2;
+		// Each position is half a radius up or down
+		return base - (position * radius) / 2;
+	}
+
+	// Get position of a note on the staff
+	function getNotePosition(note, NOTES) {
+		return NOTES[note] || 0;
+	}
+
+	// Create createFeatures factory for drawing elements
+	export const createFeatures = (
+		group,
+		{
+			radius,
+			verticalPadding,
+			staffHeight,
+			config,
+			startPadding,
+			firstBarWidth,
+			regularBarWidth,
+			endPadding,
+			currentClef,
+			currentKeySignature,
+			currentTimeSignature,
+			scaledFontSize,
+			SVG_WIDTH,
+			SHARP_POSITIONS,
+			FLAT_POSITIONS,
+			NOTE,
+			REST_CONFIG,
+			ACCIDENTAL,
+			NOTES
+		}
+	) => ({
+		staffLine: (systemIndex, lineIndex, barsInSystem) => {
+			const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
+			const yPosition = yStart + lineIndex * radius;
+
+			// Calculate the exact end position for staff lines
+			// This ensures the staff lines extend far enough for all bars
+			let staffEndX = startPadding;
+			if (barsInSystem === 1) {
+				staffEndX = startPadding + firstBarWidth + endPadding;
+			} else if (barsInSystem > 1) {
+				staffEndX =
+					startPadding + firstBarWidth + (barsInSystem - 1) * regularBarWidth + endPadding;
+			}
+
+			group
+				.append('line')
+				.attr('class', 'staff-line')
+				.attr('x1', startPadding)
+				.attr('x2', staffEndX)
+				.attr('y1', yPosition)
+				.attr('y2', yPosition)
+				.attr('stroke', config.staffLineColor)
+				.attr('stroke-width', config.staffLineWidth);
+		},
+		barLine: (system, barIndex, isSystemBoundary = false) => {
+			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+			let xPos = startPadding;
+
+			if (barIndex === 1) {
+				xPos += firstBarWidth;
+			} else if (barIndex > 1) {
+				xPos += firstBarWidth + (barIndex - 1) * regularBarWidth;
+			}
+
+			// Ensure position doesn't exceed width
+			xPos = Math.min(xPos, SVG_WIDTH - endPadding);
+
+			group
+				.append('line')
+				.attr('class', 'bar-line')
+				.attr('x1', xPos)
+				.attr('x2', xPos)
+				.attr('y1', yStart)
+				.attr('y2', yStart + staffHeight)
+				.attr('stroke', 'black')
+				.attr('stroke-width', isSystemBoundary ? 2 : 1.5);
+		},
+		clef: (system) => {
+			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+			const yPosition = yStart + calculateStaffPosition(currentClef.offset, radius);
+
+			group
+				.append('text')
+				.attr('class', 'clef')
+				.attr('x', startPadding + radius * 2)
+				.attr('y', yPosition)
+				.attr('text-anchor', 'middle')
+				.attr('class', 'smuFL-symbol')
+				.style('font-size', `${scaledFontSize}px`)
+				.text(String.fromCodePoint(parseInt(currentClef.code.replace('U+', ''), 16)));
+		},
+		timeSignature: (system) => {
+			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+			// Position time signature after key signature
+			const baseXPos = startPadding + radius * 5; // Base position after clef
+			// Add space for key signature accidentals
+			const keySigWidth = Math.max(currentKeySignature.sharps, currentKeySignature.flats) * radius;
+			const xPosition = baseXPos + keySigWidth + (keySigWidth > 0 ? radius : 0);
+
+			if (system === 0) {
+				// Always use numeric representation for consistency
+				// Draw numerator
+				group
+					.append('text')
+					.attr('class', 'time-signature-numerator')
+					.attr('x', xPosition)
+					.attr('y', yStart + radius * 0.5)
+					.attr('text-anchor', 'middle')
+					.attr('class', 'smuFL-symbol')
+					.style('font-size', `${scaledFontSize}px`)
+					.text(
+						String.fromCodePoint(parseInt(currentTimeSignature.numeratorCode.replace('U+', ''), 16))
+					);
+
+				// Draw denominator
+				group
+					.append('text')
+					.attr('class', 'time-signature-denominator')
+					.attr('x', xPosition)
+					.attr('y', yStart + radius * 2.5)
+					.attr('text-anchor', 'middle')
+					.attr('class', 'smuFL-symbol')
+					.style('font-size', `${scaledFontSize}px`)
+					.text(
+						String.fromCodePoint(
+							parseInt(currentTimeSignature.denominatorCode.replace('U+', ''), 16)
+						)
+					);
+			}
+		},
+		keySignature: (system) => {
+			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+			const baseXPos = startPadding + radius * 5; // Reduced from 7 to bring closer to clef
+
+			// Draw sharps or flats based on key signature
+			if (currentKeySignature.sharps > 0) {
+				for (let i = 0; i < currentKeySignature.sharps; i++) {
+					const position = SHARP_POSITIONS[i];
+					const yPos = yStart + calculateStaffPosition(position, radius);
+					const xPos = baseXPos + i * radius;
+
+					group
+						.append('text')
+						.attr('class', 'key-signature')
+						.attr('x', xPos)
+						.attr('y', yPos)
+						.attr('text-anchor', 'middle')
+						.attr('class', 'smuFL-symbol')
+						.style('font-size', `${scaledFontSize}px`)
+						.text(String.fromCodePoint(parseInt(ACCIDENTAL.sharp.replace('U+', ''), 16))); // Sharp symbol
+				}
+			} else if (currentKeySignature.flats > 0) {
+				for (let i = 0; i < currentKeySignature.flats; i++) {
+					const position = FLAT_POSITIONS[i];
+					const yPos = yStart + calculateStaffPosition(position, radius);
+					const xPos = baseXPos + i * radius;
+
+					group
+						.append('text')
+						.attr('class', 'key-signature')
+						.attr('x', xPos)
+						.attr('y', yPos)
+						.attr('text-anchor', 'middle')
+						.attr('class', 'smuFL-symbol')
+						.style('font-size', `${scaledFontSize}px`)
+						.text(String.fromCodePoint(parseInt(ACCIDENTAL.flat.replace('U+', ''), 16))); // Flat symbol
+				}
+			}
+		},
+		note: (system, barIndex, noteData) => {
+			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
+
+			// Calculate x position based on bar position
+			let barStartX = startPadding;
+			if (barIndex > 0) {
+				barStartX += firstBarWidth + (barIndex - 1) * regularBarWidth;
+			}
+
+			// Position within the bar
+			const xPos = barStartX + (noteData.position || 0.5) * regularBarWidth;
+			const yPos = yStart + calculateStaffPosition(getNotePosition(noteData.note, NOTES), radius);
+
+			let noteSymbol;
+			if (noteData.rest) {
+				const restCode = REST_CONFIG[noteData.duration]?.code || '';
+				noteSymbol = String.fromCodePoint(parseInt(restCode.replace('U+', ''), 16));
+			} else {
+				const noteDirection = noteData.direction || 'down';
+				const noteCode = NOTE[noteDirection]?.[noteData.duration]?.code || '';
+				noteSymbol = String.fromCodePoint(parseInt(noteCode.replace('U+', ''), 16));
+			}
+
+			group
+				.append('text')
+				.attr('class', 'note')
+				.attr('x', xPos)
+				.attr('y', yPos)
+				.attr('text-anchor', 'middle')
+				.attr('class', 'smuFL-symbol')
+				.style('font-size', `${scaledFontSize}px`)
+				.text(noteSymbol);
+		}
+	});
 
 	// --- REACTIVE DIMENSIONS ---
 	$: scaledFontSize = radius * 4; // Scale font size based on radius
@@ -87,6 +312,13 @@
 		handleResize();
 		window.addEventListener('resize', handleResize);
 
+		// Add example notes to demonstrate the functionality
+		addNote(0, { note: 'C4', duration: 'quarter' });
+		addNote(3, { note: 'E4', duration: 'eighth', direction: 'up' });
+		addNote(5, { note: 'G4', duration: 'half', position: 1 });
+		addNote(8, { note: 'B4', duration: 'whole' });
+		addNote(11, { note: 'F4', duration: 'quarter', rest: true });
+
 		return () => {
 			window.removeEventListener('resize', handleResize);
 		};
@@ -104,6 +336,38 @@
 	function handleResize(): void {
 		if (!container) return;
 		SVG_WIDTH = container.clientWidth;
+		updateStaffLayout();
+	}
+
+	// Function to add a note to a specific bar
+	function addNote(
+		barIndex: number,
+		noteData: {
+			note: string;
+			duration: string;
+			direction?: string;
+			rest?: boolean;
+			position?: number;
+		}
+	): void {
+		// Validate bar index
+		if (barIndex < 0 || barIndex >= barCount) {
+			console.error(`Bar index ${barIndex} is out of range (0-${barCount - 1})`);
+			return;
+		}
+
+		// Add the note to our data structure
+		scoreNotes.push({
+			barIndex,
+			note: noteData.note,
+			duration: noteData.duration,
+			direction: noteData.direction || direction,
+			rest: noteData.rest !== undefined ? noteData.rest : rest,
+			position: noteData.position || 0.5
+		});
+
+		// Force update to render the new note
+		scoreNotes = [...scoreNotes];
 		updateStaffLayout();
 	}
 
@@ -174,13 +438,21 @@
 				draw.barLine(systemIndex, barIndex, barIndex === barsInSystem);
 			}
 
-			// Example note rendering - this would be where you'd add actual notes
-			draw.note(systemIndex, 0, {
-				note: 'C4',
-				duration: 'quarter',
-				direction: 'down',
-				position: 0.5
-			});
+			// Render notes for this system
+			for (const noteData of scoreNotes) {
+				// Only render notes that belong to bars in this system
+				if (noteData.barIndex >= startBarIndex && noteData.barIndex < endBarIndex) {
+					// Calculate the relative bar index within this system
+					const systemRelativeBarIndex = noteData.barIndex - startBarIndex;
+					draw.note(systemIndex, systemRelativeBarIndex, {
+						note: noteData.note,
+						duration: noteData.duration,
+						direction: noteData.direction,
+						rest: noteData.rest,
+						position: noteData.position || 0.5
+					});
+				}
+			}
 		}
 	}
 </script>
