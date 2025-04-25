@@ -94,7 +94,7 @@ export const createFeatures = (
 	},
 	clef: (system) => {
 		const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-		const yPosition = yStart + calculateStaffPosition(currentClef.offset, radius);
+		const yPosition = yStart + calculateStaffPosition(currentClef.yPosition, radius);
 
 		group
 			.append('text')
@@ -149,10 +149,20 @@ export const createFeatures = (
 		const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
 		const baseXPos = startPadding + radius * 5; // Reduced from 7 to bring closer to clef
 
+		// Adjust sharp and flat positions based on the current clef
+		const adjustPositionForClef = (position) => {
+			// Apply the clef offset to adjust the position
+			if (currentClef && currentClef.offset !== undefined) {
+				return position + currentClef.offset;
+			}
+			return position;
+		};
+
 		// Draw sharps or flats based on key signature
 		if (currentKeySignature.sharps > 0) {
 			for (let i = 0; i < currentKeySignature.sharps; i++) {
-				const position = SHARP_POSITIONS[i];
+				// Adjust the position based on the current clef
+				const position = adjustPositionForClef(SHARP_POSITIONS[i]);
 				const yPos = yStart + calculateStaffPosition(position, radius);
 				const xPos = baseXPos + i * radius;
 
@@ -168,7 +178,8 @@ export const createFeatures = (
 			}
 		} else if (currentKeySignature.flats > 0) {
 			for (let i = 0; i < currentKeySignature.flats; i++) {
-				const position = FLAT_POSITIONS[i];
+				// Adjust the position based on the current clef
+				const position = adjustPositionForClef(FLAT_POSITIONS[i]);
 				const yPos = yStart + calculateStaffPosition(position, radius);
 				const xPos = baseXPos + i * radius;
 

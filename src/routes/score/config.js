@@ -26,10 +26,10 @@
 	];
 
 	export const CLEF = {
-		treble: { root: 'G', code: 'U+E050', description: 'G clef', name: 'Treble', offset:-1 },
-		bass: { root: 'F', code: 'U+E062', description: 'F clef', name: 'Bass', offset:3 },
-		alto: { root: 'C', code: 'U+E05C', description: 'C clef', name: 'Alto', offset:1 },
-		tenor: { root: 'C', code: 'U+E05C', description: 'C clef', name: 'Tenor', offset:3 }
+		treble: { root: 'G', code: 'U+E050', description: 'G clef', name: 'Treble', yPosition:-1, offset: 0 },
+		bass: { root: 'F', code: 'U+E062', description: 'F clef', name: 'Bass', yPosition:3, offset: -2 },
+		alto: { root: 'C', code: 'U+E05C', description: 'C clef', name: 'Alto', yPosition:1, offset: -1 },
+		tenor: { root: 'C', code: 'U+E05C', description: 'C clef', name: 'Tenor', yPosition:3, offset: -1 }
 	};
 
 	export const TIME_SIGNATURE = {
