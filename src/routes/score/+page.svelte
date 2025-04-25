@@ -29,6 +29,9 @@
 	let radius = 10; // Base radius unit for staff notation
 	let scoreNotes = []; // Store notes in a structured format
 
+	// Track previous clef to detect changes
+	let previousClef = clef;
+
 	// DOM references
 	let container;
 	let svg = null;
@@ -65,6 +68,12 @@
 	$: currentTimeSignature = TIME_SIGNATURE[timeSignature];
 	$: accidentalsCount = Math.max(currentKeySignature.sharps, currentKeySignature.flats);
 
+	// Watch for clef changes and adjust notes accordingly
+	$: if (svg && clef !== previousClef && scoreNotes.length > 0) {
+		adjustNotesForClefChange(previousClef, clef);
+		previousClef = clef;
+	}
+
 	// Layout calculations
 	$: padding = radius * 2; // Basic padding for layout
 	$: startPadding = 0;
@@ -95,7 +104,7 @@
 		window.addEventListener('resize', handleResize);
 
 		// Add example notes
-		console.log('Adding example notes');
+		// console.log('Adding example notes');
 		scoreNotes = [];
 
 		// Add notes to bar 1 with automatic sequential placement
@@ -118,6 +127,8 @@
 			cleanupListeners();
 		};
 	});
+
+	$: console.log(scoreNotes);
 
 	// --- PURE FUNCTIONS ---
 
@@ -185,7 +196,7 @@
 		}
 
 		const staffPosition = calculateStaffPositionFromY(mousePosition.y, systemInfo.index, context);
-		const closestNote = findClosestNote(staffPosition, NOTES);
+		const closestNote = findClosestNote(staffPosition, NOTES, currentClef);
 		const { startTime, position } = calculateNoteStartTimeAndPosition(
 			barInfo.index,
 			scoreNotes,
@@ -221,9 +232,9 @@
 		if (!barInfo.valid) return;
 
 		const staffPosition = calculateStaffPositionFromY(mousePosition.y, systemInfo.index, context);
-		const clickedNote = findClosestNote(staffPosition, NOTES);
+		const clickedNote = findClosestNote(staffPosition, NOTES, currentClef);
 
-		console.log(`Clicked at staff position ${staffPosition}, adding note ${clickedNote}`);
+		// console.log(`Clicked at staff position ${staffPosition}, adding note ${clickedNote}`);
 
 		const newNote = {
 			barIndex: barInfo.index,
@@ -289,13 +300,14 @@
 	}
 
 	// Note Finding and Calculation
-	function findClosestNote(staffPosition, NOTES) {
+	function findClosestNote(staffPosition, NOTES, currentClef) {
 		const noteEntries = Object.entries(NOTES);
 		let closestNote = noteEntries[0][0];
-		let closestDistance = Math.abs(NOTES[closestNote] - staffPosition);
+		let closestDistance = Math.abs(getNotePosition(closestNote, NOTES, currentClef) - staffPosition);
 
 		for (const [noteName, notePosition] of noteEntries) {
-			const distance = Math.abs(notePosition - staffPosition);
+			const adjustedPosition = getNotePosition(noteName, NOTES, currentClef);
+			const distance = Math.abs(adjustedPosition - staffPosition);
 			if (distance < closestDistance) {
 				closestDistance = distance;
 				closestNote = noteName;
@@ -408,7 +420,7 @@
 		const { xPos, yStart } = calculateNotePosition(barIndex, position, context);
 
 		// Calculate vertical position based on the note
-		const yPos = yStart + calculateStaffPosition(getNotePosition(note, NOTES), context.radius);
+		const yPos = yStart + calculateStaffPosition(getNotePosition(note, NOTES, context.currentClef), context.radius);
 
 		// Clear previous ghost note content
 		ghostNote.selectAll('*').remove();
@@ -580,6 +592,18 @@
 		return updatedNotes;
 	}
 
+	// Function to adjust notes when clef changes
+	function adjustNotesForClefChange(oldClef, newClef) {
+		if (!oldClef || !newClef || oldClef === newClef) return;
+
+		// No need to modify the actual note names
+		// We just need to re-render the staff with the new clef
+		// The visual position of the notes will automatically adjust based on the new clef
+		if (svg) {
+			renderStaff(svg, createRenderContext());
+		}
+	}
+
 	// Context Creation
 	function createRenderContext() {
 		return {
@@ -607,10 +631,7 @@
 	}
 
 	// --- REACTIVE UPDATES ---
-	$: if (
-		svg &&
-		(barCount || SVG_WIDTH || keySignature || timeSignature || clef !== undefined || radius)
-	) {
+	$: if (svg && (barCount || SVG_WIDTH || keySignature || timeSignature || radius)) {
 		renderStaff(svg, createRenderContext());
 	}
 </script>
