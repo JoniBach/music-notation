@@ -708,8 +708,12 @@
 		const yRelativeToStaff = y - yStart;
 
 		// Convert the y position to a staff position
-		// Each staff position is half a radius in height
-		const staffPosition = Math.round((radius * 2 - yRelativeToStaff) / (radius / 2));
+		// Fix: Adjust the calculation to match the NOTES object scale
+		// The NOTES object has integer values with 1 unit between each note
+		const staffPosition = Math.round((2.5 * radius - yRelativeToStaff) / (radius / 2));
+
+		// Log the calculated position for debugging
+		console.log(`Raw staff position: ${staffPosition}`);
 
 		// Find the closest note to the clicked position
 		let clickedNote = 'C4'; // Default fallback
@@ -729,7 +733,9 @@
 		}
 
 		clickedNote = closestNote[0];
-		console.log(`Clicked at staff position ${staffPosition}, adding note ${clickedNote}`);
+		console.log(
+			`Clicked at staff position ${staffPosition}, adding note ${clickedNote} (position value: ${closestNote[0]})`
+		);
 
 		// Add a note at the clicked position
 		addNote(barIndex, {
