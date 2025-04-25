@@ -1,6 +1,6 @@
 
 	// Helper function to calculate vertical position on staff
-	function calculateStaffPosition(position, radius) {
+	export function calculateStaffPosition(position, radius) {
 		// Base position is the middle line (B4)
 		const base = radius * 2;
 		// Each position is half a radius up or down
@@ -8,7 +8,7 @@
 	}
 
 	// Get position of a note on the staff
-	function getNotePosition(note, NOTES) {
+	export function getNotePosition(note, NOTES) {
 		return NOTES[note] || 0;
 	}
 
@@ -214,8 +214,7 @@
 				noteSymbol = String.fromCodePoint(parseInt(restCode.replace('U+', ''), 16));
 			} else {
 				const noteDirection = noteData.direction || 'down';
-				const noteCode =
-					NOTE[noteDirection]?.[noteData.duration]?.code || '';
+				const noteCode = NOTE[noteDirection]?.[noteData.duration]?.code || '';
 				noteSymbol = String.fromCodePoint(parseInt(noteCode.replace('U+', ''), 16));
 			}
 
