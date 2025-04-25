@@ -291,6 +291,17 @@
 	let container: HTMLDivElement;
 	let svg: any = null;
 	let SVG_WIDTH = 400;
+	let ghostNote: any = null; // Reference to the ghost note element
+	let ghostNoteData = {
+		note: 'C4',
+		duration: 'quarter',
+		direction: 'down',
+		rest: false,
+		barIndex: 0,
+		systemIndex: 0,
+		position: 0.5,
+		visible: false
+	};
 
 	// --- DERIVED VALUES ---
 	// Calculate the extra width needed for the first bar based on key signature
@@ -321,6 +332,57 @@
 	$: staffHeight = (config.staffLines - 1) * radius;
 	$: TOTAL_HEIGHT = verticalPadding * 2 + systemCount * (staffHeight + config.systemMarginTop);
 
+	// --- UTILITY FUNCTIONS ---
+	// Calculate position of a note in a specific bar
+	function calculateNotePosition(barIndex: number, position: number) {
+		// Find which system the bar belongs to
+		const systemIndex = Math.floor(barIndex / barsPerSystem);
+
+		// Calculate the relative bar index within the system
+		const systemRelativeBarIndex = barIndex - systemIndex * barsPerSystem;
+
+		// Calculate the starting X position of the bar
+		let barStartX = startPadding;
+		if (systemRelativeBarIndex > 0) {
+			barStartX += firstBarWidth + (systemRelativeBarIndex - 1) * regularBarWidth;
+		}
+
+		// Get the width of the current bar
+		const barWidth = systemRelativeBarIndex === 0 ? firstBarWidth : regularBarWidth;
+
+		// Position within the bar based on position parameter (0-1)
+		const barPadding = radius * 0.5; // Padding from bar lines
+		const usableBarWidth = barWidth - barPadding * 2; // Width available for notes
+
+		// Calculate the x position with padding
+		const xPos = barStartX + barPadding + position * usableBarWidth;
+
+		// Calculate the y-start position for the system
+		const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
+
+		return { xPos, yStart, systemIndex, systemRelativeBarIndex };
+	}
+
+	// Get the note symbol for a specific note configuration
+	function getNoteSymbol(noteConfig: {
+		note: string;
+		duration: string;
+		direction: string;
+		rest: boolean;
+	}) {
+		if (noteConfig.rest) {
+			const restCode = REST_CONFIG[noteConfig.duration as keyof typeof REST_CONFIG]?.code || '';
+			return String.fromCodePoint(parseInt(restCode.replace('U+', ''), 16));
+		} else {
+			const noteDirection = noteConfig.direction || 'down';
+			const noteCode =
+				NOTE[noteDirection as keyof typeof NOTE]?.[
+					noteConfig.duration as keyof (typeof NOTE)['down']
+				]?.code || '';
+			return String.fromCodePoint(parseInt(noteCode.replace('U+', ''), 16));
+		}
+	}
+
 	// --- LIFECYCLE HANDLERS ---
 	onMount(() => {
 		if (!browser) return;
@@ -331,6 +393,9 @@
 			.append('svg')
 			.attr('width', SVG_WIDTH)
 			.attr('height', TOTAL_HEIGHT);
+
+		// Create a ghost note group
+		ghostNote = svg.append('g').attr('class', 'ghost-note').style('opacity', 0); // Start invisible
 
 		handleResize();
 		window.addEventListener('resize', handleResize);
@@ -353,12 +418,252 @@
 		// Add event listener for staff clicks - only in browser environment
 		d3.select('#staff-container').on('click', handleStaffClick);
 
+		// Add mousemove event listener to update ghost note position
+		d3.select('#staff-container').on('mousemove', handleMouseMove);
+
+		// Add mouseenter/mouseleave to show/hide ghost note
+		d3.select('#staff-container').on('mouseenter', () => {
+			ghostNoteData.visible = true;
+			updateGhostNote();
+		});
+
+		d3.select('#staff-container').on('mouseleave', () => {
+			ghostNoteData.visible = false;
+			updateGhostNote();
+		});
+
 		return () => {
 			window.removeEventListener('resize', handleResize);
 			// Remove event listeners when component is destroyed
 			d3.select('#staff-container').on('click', null);
+			d3.select('#staff-container').on('mousemove', null);
+			d3.select('#staff-container').on('mouseenter', null);
+			d3.select('#staff-container').on('mouseleave', null);
 		};
 	});
+
+	// Function to handle mouse movement to update ghost note position
+	function handleMouseMove(event: MouseEvent): void {
+		if (!svg || !ghostNote) return;
+
+		// Get the mouse coordinates relative to the SVG
+		const svgRect = svg.node().getBoundingClientRect();
+		const x = event.clientX - svgRect.left;
+		const y = event.clientY - svgRect.top;
+
+		// Calculate which system and bar the mouse is over
+		let systemIndex = Math.floor((y - verticalPadding) / (staffHeight + config.systemMarginTop));
+		if (systemIndex < 0 || systemIndex >= systemCount) {
+			// Mouse is not over a valid system
+			ghostNoteData.visible = false;
+			updateGhostNote();
+			return;
+		}
+
+		// Calculate the bar index
+		const startBarIndex = systemIndex * barsPerSystem;
+		const xRelativeToSystem = x - startPadding;
+		let barIndex = startBarIndex;
+
+		if (xRelativeToSystem < 0) {
+			// Mouse is not over a valid bar
+			ghostNoteData.visible = false;
+			updateGhostNote();
+			return;
+		}
+
+		if (xRelativeToSystem < firstBarWidth) {
+			// Mouse is over the first bar of the system
+			barIndex = startBarIndex;
+		} else {
+			// Mouse is over a subsequent bar
+			const barOffset = Math.floor((xRelativeToSystem - firstBarWidth) / regularBarWidth) + 1;
+			barIndex = startBarIndex + barOffset;
+		}
+
+		// Ensure the bar index is valid
+		if (barIndex >= barCount) {
+			ghostNoteData.visible = false;
+			updateGhostNote();
+			return;
+		}
+
+		// Calculate the vertical position on the staff
+		const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
+		const yRelativeToStaff = y - yStart;
+
+		// Convert the y position to a staff position
+		const staffPosition = Math.round((radius * 2 - yRelativeToStaff) / (radius / 2));
+
+		// Find the closest note to the mouse position
+		const noteEntries = Object.entries(NOTES);
+		let closestNote = noteEntries[0];
+		let closestDistance = Math.abs(NOTES[closestNote[0] as keyof typeof NOTES] - staffPosition);
+
+		for (const [noteName, notePosition] of noteEntries) {
+			const distance = Math.abs(notePosition - staffPosition);
+			if (distance < closestDistance) {
+				closestDistance = distance;
+				closestNote = [noteName, notePosition];
+			}
+		}
+
+		// Calculate where this note would be placed in the bar based on existing notes
+		// Get the current time signature's total duration for the bar
+		const barDuration = currentTimeSignature.duration;
+
+		// Find all notes in the current bar
+		const notesInBar = scoreNotes.filter((n) => n.barIndex === barIndex);
+
+		// Calculate the start time for the new note
+		let startTime = 0;
+		if (notesInBar.length > 0) {
+			// Find the latest end time of notes in this bar
+			let latestEndTime = 0;
+			for (const note of notesInBar) {
+				// Get the duration from the config based on the note type
+				const noteDuration = note.rest
+					? REST_CONFIG[note.duration as keyof typeof REST_CONFIG]?.duration || 0
+					: NOTE[note.direction as keyof typeof NOTE][note.duration as keyof (typeof NOTE)['down']]
+							?.duration || 0;
+
+				// Calculate when this note ends
+				const noteEndTime = note.startTime + noteDuration;
+
+				// Keep track of the latest end time
+				latestEndTime = Math.max(latestEndTime, noteEndTime);
+			}
+
+			// The new note starts at the latest end time
+			startTime = latestEndTime;
+		}
+
+		// Calculate position as a normalized value (0-1) within the bar based on start time
+		const position = startTime / barDuration;
+
+		// Update ghost note data with the currently selected note properties
+		ghostNoteData = {
+			...ghostNoteData,
+			note: closestNote[0],
+			duration: note, // Use currently selected note duration
+			direction: direction, // Use currently selected note direction
+			rest: rest, // Use currently selected rest state
+			barIndex,
+			systemIndex,
+			position,
+			visible: true
+		};
+
+		// Update the ghost note
+		updateGhostNote();
+	}
+
+	// Add a function to handle clicking on the staff to add notes
+	function handleStaffClick(event: MouseEvent): void {
+		if (!svg) return;
+
+		// Get the click coordinates relative to the SVG
+		const svgRect = svg.node().getBoundingClientRect();
+		const x = event.clientX - svgRect.left;
+		const y = event.clientY - svgRect.top;
+
+		// Use the same logic as in handleMouseMove to determine bar and note
+		// Calculate which system and bar was clicked
+		let systemIndex = Math.floor((y - verticalPadding) / (staffHeight + config.systemMarginTop));
+		if (systemIndex < 0 || systemIndex >= systemCount) return;
+
+		// Calculate the bar index
+		const startBarIndex = systemIndex * barsPerSystem;
+		const xRelativeToSystem = x - startPadding;
+		let barIndex = startBarIndex;
+
+		if (xRelativeToSystem < 0) return;
+
+		if (xRelativeToSystem < firstBarWidth) {
+			// Clicked in the first bar of the system
+			barIndex = startBarIndex;
+		} else {
+			// Clicked in a subsequent bar
+			const barOffset = Math.floor((xRelativeToSystem - firstBarWidth) / regularBarWidth) + 1;
+			barIndex = startBarIndex + barOffset;
+		}
+
+		// Ensure the bar index is valid
+		if (barIndex >= barCount) return;
+
+		// Calculate the vertical position on the staff to determine the note
+		const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
+		const yRelativeToStaff = y - yStart;
+
+		// Convert the y position to a staff position
+		const staffPosition = Math.round((radius * 2 - yRelativeToStaff) / (radius / 2));
+
+		// Find the closest note to the clicked position
+		const noteEntries = Object.entries(NOTES);
+		let closestNote = noteEntries[0];
+		let closestDistance = Math.abs(NOTES[closestNote[0] as keyof typeof NOTES] - staffPosition);
+
+		for (const [noteName, notePosition] of noteEntries) {
+			const distance = Math.abs(notePosition - staffPosition);
+			if (distance < closestDistance) {
+				closestDistance = distance;
+				closestNote = [noteName, notePosition];
+			}
+		}
+
+		const clickedNote = closestNote[0];
+
+		console.log(`Clicked at staff position ${staffPosition}, adding note ${clickedNote}`);
+
+		// Add a note at the clicked position with the current note settings
+		// Use automatic positioning based on time
+		addNote(barIndex, {
+			note: clickedNote,
+			duration: note,
+			direction: direction,
+			rest: rest
+		});
+	}
+
+	// Function to update the ghost note appearance and position
+	function updateGhostNote(): void {
+		if (!ghostNote) return;
+
+		// If not visible, hide the ghost note
+		if (!ghostNoteData.visible) {
+			ghostNote.style('opacity', 0);
+			return;
+		}
+
+		// Calculate position
+		const { note, barIndex, position, duration, direction, rest } = ghostNoteData;
+		const { xPos, yStart } = calculateNotePosition(barIndex, position);
+
+		// Calculate vertical position based on the note
+		const yPos = yStart + calculateStaffPosition(getNotePosition(note, NOTES), radius);
+
+		// Clear previous ghost note content
+		ghostNote.selectAll('*').remove();
+
+		// Add the note symbol
+		ghostNote.attr('transform', `translate(${xPos}, ${yPos})`).style('opacity', 0.6);
+
+		// Add the actual note symbol
+		ghostNote
+			.append('text')
+			.attr('class', 'smuFL-symbol')
+			.attr('text-anchor', 'middle')
+			.style('font-size', `${scaledFontSize}px`)
+			.style('fill', '#666')
+			.text(
+				getNoteSymbol({
+					note,
+					duration,
+					direction,
+					rest
+				})
+			);
+	}
 
 	// --- REACTIVE UPDATES ---
 	$: if (
@@ -555,85 +860,6 @@
 				}
 			}
 		}
-	}
-
-	// Add a function to handle clicking on the staff to add notes
-	function handleStaffClick(event: MouseEvent): void {
-		if (!svg) return;
-
-		// Get the click coordinates relative to the SVG
-		const svgRect = svg.node().getBoundingClientRect();
-		const x = event.clientX - svgRect.left;
-		const y = event.clientY - svgRect.top;
-
-		// Determine which bar was clicked
-		// This is a simplified calculation and might need refinement
-		let barIndex = 0;
-		let systemIndex = 0;
-
-		// Calculate which system was clicked
-		systemIndex = Math.floor((y - verticalPadding) / (staffHeight + config.systemMarginTop));
-		if (systemIndex < 0 || systemIndex >= systemCount) return;
-
-		// Calculate the bar index within the system
-		const startBarIndex = systemIndex * barsPerSystem;
-		const xRelativeToSystem = x - startPadding;
-
-		if (xRelativeToSystem < 0) return;
-
-		if (xRelativeToSystem < firstBarWidth) {
-			// Clicked in the first bar of the system
-			barIndex = startBarIndex;
-		} else {
-			// Clicked in a subsequent bar
-			const barOffset = Math.floor((xRelativeToSystem - firstBarWidth) / regularBarWidth) + 1;
-			barIndex = startBarIndex + barOffset;
-		}
-
-		// Ensure the bar index is valid
-		if (barIndex >= barCount) return;
-
-		// Calculate the vertical position on the staff to determine the note
-		const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
-		const yRelativeToStaff = y - yStart;
-
-		// Convert the y position to a staff position
-		// Fix: Adjust the calculation to match the NOTES object scale
-		// The NOTES object has integer values with 1 unit between each note
-		const staffPosition = Math.round((2.5 * radius - yRelativeToStaff) / (radius / 2));
-
-		// Log the calculated position for debugging
-		console.log(`Raw staff position: ${staffPosition}`);
-
-		// Find the closest note to the clicked position
-		let clickedNote = 'C4'; // Default fallback
-
-		// Convert staff position to note
-		// We need to find the note that corresponds to this staff position
-		const noteEntries = Object.entries(NOTES);
-		let closestNote = noteEntries[0];
-		let closestDistance = Math.abs(NOTES[closestNote[0] as keyof typeof NOTES] - staffPosition);
-
-		for (const [noteName, notePosition] of noteEntries) {
-			const distance = Math.abs(notePosition - staffPosition);
-			if (distance < closestDistance) {
-				closestDistance = distance;
-				closestNote = [noteName, notePosition];
-			}
-		}
-
-		clickedNote = closestNote[0];
-		console.log(
-			`Clicked at staff position ${staffPosition}, adding note ${clickedNote} (position value: ${closestNote[0]})`
-		);
-
-		// Add a note at the clicked position
-		addNote(barIndex, {
-			note: clickedNote, // Use the note determined by the vertical position
-			duration: note, // Use the currently selected note duration
-			direction: direction,
-			rest: rest
-		});
 	}
 </script>
 
