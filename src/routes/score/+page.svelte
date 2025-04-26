@@ -363,11 +363,7 @@
 	function calculateNoteStartTimeAndPosition(barIndex, notes, timeSignature, noteIndex = null) {
 		// If using noteIndex, calculate bar and position from the note's index
 		if (noteIndex !== null) {
-			const result = calculateBarFromNoteIndex(
-				noteIndex,
-				notes,
-				timeSignature
-			);
+			const result = calculateBarFromNoteIndex(noteIndex, notes, timeSignature);
 			return {
 				startTime: result.totalDuration,
 				position: result.positionInBar,
@@ -577,10 +573,10 @@
 
 		// Calculate position
 		const { note, barIndex, position, duration, direction, rest, noteIndex } = ghostNoteState;
-		
+
 		// First check if we have noteIndex - if so, use that for positioning
 		let xPos, yStart;
-		
+
 		// If we have a noteIndex, calculate position based on our noteIndex algorithm
 		if (noteIndex !== undefined) {
 			// Get the note's position based on the noteIndex
@@ -589,14 +585,14 @@
 				context.scoreNotes,
 				context.currentTimeSignature
 			);
-			
+
 			// Use the calculated bar index and position
 			const calculatedPosition = calculateNotePosition(
-				positionInfo.barIndex, 
-				positionInfo.positionInBar, 
+				positionInfo.barIndex,
+				positionInfo.positionInBar,
 				context
 			);
-			
+
 			xPos = calculatedPosition.xPos + context.radius * 0.5; // Add same offset as in features.js
 			yStart = calculatedPosition.yStart;
 		} else {
