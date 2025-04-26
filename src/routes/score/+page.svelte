@@ -26,6 +26,7 @@
 	let barCount = 12;
 	let radius = 10;
 	let scoreNotes = [];
+	let bpm = 120;
 
 	let previousClef = clef;
 
@@ -763,6 +764,7 @@
 		bind:direction
 		bind:rest
 		bind:radius
+		bind:bpm
 	/>
 	<div class="staff-container" id="staff-container" bind:this={container}>
 		<!-- SVG container is appended here by D3 -->

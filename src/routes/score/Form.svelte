@@ -21,7 +21,8 @@
 		direction = $bindable(),
 		rest = $bindable(),
 		barCount = $bindable(),
-		radius = $bindable()
+		radius = $bindable(),
+		bpm = $bindable()
 	} = $props();
 </script>
 
@@ -124,6 +125,20 @@
 			aria-label="Note radius"
 		/>
 		<span class="value">{radius}</span>
+	</div>
+
+	<div class="input-group">
+		<label class="label" for="bpmRange">BPM</label>
+		<input
+			class="input"
+			id="bpmRange"
+			type="range"
+			min="60"
+			max="240"
+			bind:value={bpm}
+			aria-label="Beats per minute"
+		/>
+		<span class="value">{bpm}</span>
 	</div>
 
 	<hr />
