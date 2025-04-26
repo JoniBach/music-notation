@@ -119,7 +119,11 @@
 	}
 
 	function createGhostNoteGroup(svg) {
-		return svg.append('g').attr('class', 'ghost-note').style('opacity', 0);
+		return svg
+			.append('g')
+			.attr('class', 'ghost-note')
+			.style('opacity', 0)
+			.style('pointer-events', 'none');
 	}
 
 	function setupEventListeners(selector) {
@@ -203,6 +207,27 @@
 		ghostNoteState.rest = rest;
 
 		updateGhostNote(ghostNote, ghostNoteState, context);
+	}
+
+	function handleStaffClick(event) {
+		if (!svg || !ghostNote) return;
+
+		const context = createRenderContext();
+		const mousePosition = getMousePosition(event, svg.node());
+
+		// Only add a note if the ghost note is visible (i.e., cursor is in a valid position)
+		if (ghostNoteState.visible) {
+			const newNote = {
+				noteIndex: ghostNoteState.noteIndex,
+				note: ghostNoteState.note,
+				duration: ghostNoteState.duration,
+				direction: ghostNoteState.direction,
+				rest: ghostNoteState.rest
+			};
+
+			scoreNotes = addNote(newNote, scoreNotes, context);
+			renderStaff(svg, createRenderContext());
+		}
 	}
 
 	function getMousePosition(event, svgElement) {
@@ -724,53 +749,6 @@
 		});
 
 		return matchingNotes.length > 0 ? matchingNotes[0] : undefined;
-	}
-
-	function handleStaffClick(event) {
-		if (!svg) return;
-
-		const context = createRenderContext();
-		const mousePosition = getMousePosition(event, svg.node());
-		const systemInfo = getSystemFromY(mousePosition.y, context);
-
-		if (!systemInfo.valid) return;
-
-		const barInfo = getBarFromX(mousePosition.x, systemInfo.index, context);
-		if (!barInfo.valid) return;
-
-		const staffPosition = calculateStaffPositionFromY(mousePosition.y, systemInfo.index, context);
-		const closestNote = findClosestNote(staffPosition, NOTES, currentClef);
-
-		const existingNote = findExistingNoteAtPosition(
-			mousePosition.x,
-			systemInfo.index,
-			context.scoreNotes,
-			context
-		);
-
-		let nextNoteIndex;
-
-		if (existingNote) {
-			nextNoteIndex = existingNote.noteIndex;
-			console.log(`Using existing note index: ${nextNoteIndex}`);
-		} else {
-			nextNoteIndex = calculateNextNoteIndex(context.scoreNotes);
-			console.log(`Using new note index: ${nextNoteIndex}`);
-		}
-
-		scoreNotes = addNote(
-			{
-				noteIndex: nextNoteIndex,
-				note: closestNote,
-				duration: note,
-				direction,
-				rest
-			},
-			scoreNotes,
-			context
-		);
-
-		renderStaff(svg, createRenderContext());
 	}
 </script>
 
