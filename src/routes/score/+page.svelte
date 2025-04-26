@@ -22,7 +22,7 @@
 	let keySignature = 'c_major_a_minor';
 	let timeSignature = '4_4_common_time';
 	let clef = 'treble';
-	let note = 'double';
+	let note = 'quarter';
 	let direction = 'down';
 	let rest = false;
 	let barCount = 12;
@@ -46,7 +46,8 @@
 		duration: 'quarter',
 		direction: 'down',
 		rest: false,
-		barIndex: 0,
+		noteIndex: 0,
+		barIndex: 0, // Keep this for backward compatibility
 		systemIndex: 0,
 		position: 0.5,
 		visible: false
@@ -104,16 +105,15 @@
 		window.addEventListener('resize', handleResize);
 
 		// Add example notes
-		// console.log('Adding example notes');
 		scoreNotes = [];
 
-		// Add notes to bar 1 with automatic sequential placement
+		// Add notes with noteIndex instead of barIndex
 		const exampleNotes = [
-			{ barIndex: 1, note: 'A4', duration: 'half' },
-			{ barIndex: 1, note: 'B4', duration: 'quarter' },
-			{ barIndex: 1, note: 'C4', duration: 'eighth' },
-			{ barIndex: 1, note: 'D4', duration: 'sixteenth' },
-			{ barIndex: 1, note: 'E4', duration: 'sixteenth' }
+			{ noteIndex: 0, note: 'A4', duration: 'half' },
+			{ noteIndex: 1, note: 'B4', duration: 'quarter' },
+			{ noteIndex: 2, note: 'C4', duration: 'eighth' },
+			{ noteIndex: 3, note: 'D4', duration: 'sixteenth' },
+			{ noteIndex: 4, note: 'E4', duration: 'sixteenth' }
 		];
 
 		scoreNotes = addMultipleNotes(exampleNotes, scoreNotes);
@@ -197,25 +197,29 @@
 
 		const staffPosition = calculateStaffPositionFromY(mousePosition.y, systemInfo.index, context);
 		const closestNote = findClosestNote(staffPosition, NOTES, currentClef);
-		const { startTime, position } = calculateNoteStartTimeAndPosition(
-			barInfo.index,
-			scoreNotes,
-			currentTimeSignature
-		);
 
-		// Update ghost note data
-		Object.assign(ghostNoteState, {
-			note: closestNote,
-			duration: note,
-			direction: direction,
-			rest: rest,
-			barIndex: barInfo.index,
-			systemIndex: systemInfo.index,
-			position: position,
-			visible: true
-		});
+		// Calculate the noteIndex based on existing notes and position
+		const nextNoteIndex = calculateNextNoteIndex(context.scoreNotes);
+
+		// Update ghost note state with both noteIndex and barIndex for compatibility
+		ghostNoteState.note = closestNote;
+		ghostNoteState.barIndex = barInfo.index;
+		ghostNoteState.noteIndex = nextNoteIndex;
+		ghostNoteState.systemIndex = systemInfo.index;
+		ghostNoteState.position = barInfo.position;
+		ghostNoteState.visible = true;
+		ghostNoteState.duration = note;
+		ghostNoteState.direction = direction;
+		ghostNoteState.rest = rest;
 
 		updateGhostNote(ghostNote, ghostNoteState, context);
+	}
+
+	// Helper function to calculate next available noteIndex
+	function calculateNextNoteIndex(notes) {
+		if (!notes || notes.length === 0) return 0;
+		const existingIndices = notes.filter((n) => n.noteIndex !== undefined).map((n) => n.noteIndex);
+		return existingIndices.length > 0 ? Math.max(...existingIndices) + 1 : 0;
 	}
 
 	function handleStaffClick(event) {
@@ -228,23 +232,28 @@
 		if (!systemInfo.valid) return;
 
 		const barInfo = getBarFromX(mousePosition.x, systemInfo.index, context);
-
 		if (!barInfo.valid) return;
 
 		const staffPosition = calculateStaffPositionFromY(mousePosition.y, systemInfo.index, context);
-		const clickedNote = findClosestNote(staffPosition, NOTES, currentClef);
+		const closestNote = findClosestNote(staffPosition, NOTES, currentClef);
 
-		// console.log(`Clicked at staff position ${staffPosition}, adding note ${clickedNote}`);
+		// Get the next available noteIndex
+		const nextNoteIndex = calculateNextNoteIndex(scoreNotes);
 
-		const newNote = {
-			barIndex: barInfo.index,
-			note: clickedNote,
-			duration: note,
-			direction: direction,
-			rest: rest
-		};
+		// Add the note using noteIndex instead of barIndex
+		scoreNotes = addNote(
+			{
+				noteIndex: nextNoteIndex,
+				note: closestNote,
+				duration: note,
+				direction,
+				rest
+			},
+			scoreNotes,
+			context
+		);
 
-		scoreNotes = addNote(newNote, scoreNotes, createRenderContext());
+		// Re-render the staff
 		renderStaff(svg, createRenderContext());
 	}
 
@@ -287,7 +296,9 @@
 
 		return {
 			index: barIndex,
-			valid: barIndex < barCount
+			valid: barIndex < barCount,
+			position:
+				(xRelativeToSystem - (barIndex === startBarIndex ? 0 : firstBarWidth)) / regularBarWidth
 		};
 	}
 
@@ -303,7 +314,9 @@
 	function findClosestNote(staffPosition, NOTES, currentClef) {
 		const noteEntries = Object.entries(NOTES);
 		let closestNote = noteEntries[0][0];
-		let closestDistance = Math.abs(getNotePosition(closestNote, NOTES, currentClef) - staffPosition);
+		let closestDistance = Math.abs(
+			getNotePosition(closestNote, NOTES, currentClef) - staffPosition
+		);
 
 		for (const [noteName, notePosition] of noteEntries) {
 			const adjustedPosition = getNotePosition(noteName, NOTES, currentClef);
@@ -317,12 +330,78 @@
 		return closestNote;
 	}
 
-	function calculateNoteStartTimeAndPosition(barIndex, notes, timeSignature) {
+	// Calculate which bar a note belongs to based on noteIndex and note durations
+	function calculateBarFromNoteIndex(noteIndex, notes, timeSignature) {
+		// Get the total accumulated duration up to this note
+		let totalDuration = 0;
+		if (!notes || notes.length === 0) return { barIndex: 0, positionInBar: 0, totalDuration: 0 };
+
+		const sortedNotes = [...notes].sort((a, b) => (a.noteIndex || 0) - (b.noteIndex || 0));
+
+		// Only calculate for notes before current noteIndex
+		const precedingNotes = sortedNotes.filter((n) => (n.noteIndex || 0) < noteIndex);
+
+		for (const note of precedingNotes) {
+			// Get duration from the config based on note type
+			const noteDuration = note.rest
+				? REST_CONFIG[note.duration]?.duration || 0
+				: NOTE[note.direction || 'down'][note.duration]?.duration || 0;
+
+			totalDuration += noteDuration;
+		}
+
+		// Calculate bar index based on time signature's bar duration
+		const barDuration = timeSignature.duration;
+		const barIndex = Math.floor(totalDuration / barDuration);
+
+		// Calculate position within the bar (0-1)
+		const positionInBar = (totalDuration % barDuration) / barDuration;
+
+		return { barIndex, positionInBar, totalDuration };
+	}
+
+	function calculateNoteStartTimeAndPosition(barIndex, notes, timeSignature, noteIndex = null) {
+		// If using noteIndex, calculate bar and position from the note's index
+		if (noteIndex !== null) {
+			const result = calculateBarFromNoteIndex(
+				noteIndex,
+				notes,
+				timeSignature
+			);
+			return {
+				startTime: result.totalDuration,
+				position: result.positionInBar,
+				barIndex: result.barIndex
+			};
+		}
+
+		// Legacy code for calculating based on barIndex - keep for backward compatibility
 		// Get the current time signature's total duration for the bar
 		const barDuration = timeSignature.duration;
 
+		// Important: Sort notes by noteIndex first if available
+		const sortedNotes = [...notes].sort((a, b) => {
+			// If both have noteIndex, sort by noteIndex
+			if (a.noteIndex !== undefined && b.noteIndex !== undefined) {
+				return a.noteIndex - b.noteIndex;
+			}
+			// Otherwise use default array ordering (for backwards compatibility)
+			return 0;
+		});
+
 		// Find all notes in the current bar
-		const notesInBar = notes.filter((n) => n.barIndex === barIndex);
+		const notesInBar = sortedNotes.filter((n) => {
+			// If note has noteIndex, calculate its bar first
+			if (n.noteIndex !== undefined && n.barIndex === undefined) {
+				const { barIndex: calculatedBarIndex } = calculateBarFromNoteIndex(
+					n.noteIndex || 0,
+					notes,
+					timeSignature
+				);
+				return calculatedBarIndex === barIndex;
+			}
+			return n.barIndex === barIndex;
+		});
 
 		// Calculate the start time for the new note
 		let startTime = 0;
@@ -349,60 +428,141 @@
 		// Calculate position as a normalized value (0-1) within the bar based on start time
 		const position = startTime / barDuration;
 
-		return { startTime, position };
+		return { startTime, position, barIndex };
 	}
 
-	function calculateNotePosition(barIndex, position, context) {
-		const {
+	// Note Management
+	function addNote(noteData, existingNotes, context) {
+		const { barCount, currentTimeSignature, direction, rest } = context;
+
+		// Determine if we're using noteIndex or barIndex
+		const usingNoteIndex = noteData.noteIndex !== undefined;
+		let barIndex = noteData.barIndex;
+		let startTime, position, totalDuration;
+
+		// If using noteIndex, calculate the bar position
+		if (usingNoteIndex) {
+			const result = calculateBarFromNoteIndex(
+				noteData.noteIndex,
+				existingNotes,
+				currentTimeSignature
+			);
+			barIndex = result.barIndex;
+			position = result.positionInBar;
+			startTime = result.totalDuration;
+		} else {
+			// Validate bar index for traditional approach
+			if (barIndex < 0 || barIndex >= barCount) {
+				console.error(`Bar index ${barIndex} is out of range (0-${barCount - 1})`);
+				return existingNotes;
+			}
+
+			// If no explicit start time is provided, calculate it based on existing notes in the bar
+			if (noteData.startTime === undefined) {
+				const result = calculateNoteStartTimeAndPosition(
+					barIndex,
+					existingNotes,
+					currentTimeSignature
+				);
+				startTime = result.startTime;
+				position = result.position;
+			} else {
+				startTime = noteData.startTime;
+				position = startTime / currentTimeSignature.duration;
+			}
+		}
+
+		// Get the duration of the current note from the config
+		const noteDuration = noteData.rest
+			? REST_CONFIG[noteData.duration]?.duration || 0
+			: NOTE[noteData.direction || direction][noteData.duration]?.duration || 0;
+
+		// Validate that the note fits within overall bar count
+		if (barIndex >= barCount) {
+			console.warn(
+				`Note exceeds total bar count. Calculated Bar: ${barIndex}, Max Bars: ${barCount - 1}`
+			);
+			// Optionally handle this (adjust bar count, truncate, etc.)
+		}
+
+		// Create the new note
+		const newNote = {
+			noteIndex: noteData.noteIndex, // Store the noteIndex if it exists
+			barIndex, // Store calculated barIndex
+			note: noteData.note,
+			duration: noteData.duration,
+			direction: noteData.direction || direction,
+			rest: noteData.rest !== undefined ? noteData.rest : rest,
+			position,
+			startTime
+		};
+
+		// Return the updated notes array
+		return [...existingNotes, newNote];
+	}
+
+	function addMultipleNotes(notesData, existingNotes) {
+		const context = createRenderContext();
+		let updatedNotes = [...existingNotes];
+
+		// Sort the notesData by noteIndex to ensure ordering is consistent
+		const sortedNotesData = [...notesData].sort((a, b) => {
+			// If both have noteIndex, sort by noteIndex
+			if (a.noteIndex !== undefined && b.noteIndex !== undefined) {
+				return a.noteIndex - b.noteIndex;
+			}
+			// Default ordering
+			return 0;
+		});
+
+		for (const noteData of sortedNotesData) {
+			updatedNotes = addNote(noteData, updatedNotes, context);
+		}
+
+		return updatedNotes;
+	}
+
+	// Function to adjust notes when clef changes
+	function adjustNotesForClefChange(oldClef, newClef) {
+		if (!oldClef || !newClef || oldClef === newClef) return;
+
+		// No need to modify the actual note names
+		// We just need to re-render the staff with the new clef
+		// The visual position of the notes will automatically adjust based on the new clef
+		if (svg) {
+			renderStaff(svg, createRenderContext());
+		}
+	}
+
+	// Context Creation
+	function createRenderContext() {
+		return {
+			svg,
+			systemCount,
 			barsPerSystem,
-			startPadding,
-			firstBarWidth,
-			regularBarWidth,
+			barCount,
 			radius,
 			verticalPadding,
 			staffHeight,
-			config
-		} = context;
-
-		// Find which system the bar belongs to
-		const systemIndex = Math.floor(barIndex / barsPerSystem);
-
-		// Calculate the relative bar index within the system
-		const systemRelativeBarIndex = barIndex - systemIndex * barsPerSystem;
-
-		// Calculate the starting X position of the bar
-		let barStartX = startPadding;
-		if (systemRelativeBarIndex > 0) {
-			barStartX += firstBarWidth + (systemRelativeBarIndex - 1) * regularBarWidth;
-		}
-
-		// Get the width of the current bar
-		const barWidth = systemRelativeBarIndex === 0 ? firstBarWidth : regularBarWidth;
-
-		// Position within the bar based on position parameter (0-1)
-		const barPadding = radius * 0.5; // Padding from bar lines
-		const usableBarWidth = barWidth - barPadding * 2; // Width available for notes
-
-		// Calculate the x position with padding
-		const xPos = barStartX + barPadding + position * usableBarWidth;
-
-		// Calculate the y-start position for the system
-		const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
-
-		return { xPos, yStart, systemIndex, systemRelativeBarIndex };
+			config,
+			startPadding,
+			firstBarWidth,
+			regularBarWidth,
+			endPadding,
+			currentClef,
+			currentKeySignature,
+			currentTimeSignature,
+			scaledFontSize,
+			SVG_WIDTH,
+			scoreNotes,
+			direction,
+			rest
+		};
 	}
 
-	function getNoteSymbol(noteConfig, noteConfig_params) {
-		const { REST_CONFIG, NOTE } = noteConfig_params;
-
-		if (noteConfig.rest) {
-			const restCode = REST_CONFIG[noteConfig.duration]?.code || '';
-			return String.fromCodePoint(parseInt(restCode.replace('U+', ''), 16));
-		} else {
-			const noteDirection = noteConfig.direction || 'down';
-			const noteCode = NOTE[noteDirection]?.[noteConfig.duration]?.code || '';
-			return String.fromCodePoint(parseInt(noteCode.replace('U+', ''), 16));
-		}
+	// --- REACTIVE UPDATES ---
+	$: if (svg && (barCount || SVG_WIDTH || keySignature || timeSignature || radius)) {
+		renderStaff(svg, createRenderContext());
 	}
 
 	// Ghost Note Rendering
@@ -416,11 +576,40 @@
 		}
 
 		// Calculate position
-		const { note, barIndex, position, duration, direction, rest } = ghostNoteState;
-		const { xPos, yStart } = calculateNotePosition(barIndex, position, context);
+		const { note, barIndex, position, duration, direction, rest, noteIndex } = ghostNoteState;
+		
+		// First check if we have noteIndex - if so, use that for positioning
+		let xPos, yStart;
+		
+		// If we have a noteIndex, calculate position based on our noteIndex algorithm
+		if (noteIndex !== undefined) {
+			// Get the note's position based on the noteIndex
+			const positionInfo = calculateBarFromNoteIndex(
+				noteIndex,
+				context.scoreNotes,
+				context.currentTimeSignature
+			);
+			
+			// Use the calculated bar index and position
+			const calculatedPosition = calculateNotePosition(
+				positionInfo.barIndex, 
+				positionInfo.positionInBar, 
+				context
+			);
+			
+			xPos = calculatedPosition.xPos + context.radius * 0.5; // Add same offset as in features.js
+			yStart = calculatedPosition.yStart;
+		} else {
+			// Fallback to direct barIndex and position if no noteIndex
+			const calculatedPosition = calculateNotePosition(barIndex, position, context);
+			xPos = calculatedPosition.xPos + context.radius * 0.5; // Add same offset as in features.js
+			yStart = calculatedPosition.yStart;
+		}
 
 		// Calculate vertical position based on the note
-		const yPos = yStart + calculateStaffPosition(getNotePosition(note, NOTES, context.currentClef), context.radius);
+		const yPos =
+			yStart +
+			calculateStaffPosition(getNotePosition(note, NOTES, context.currentClef), context.radius);
 
 		// Clear previous ghost note content
 		ghostNote.selectAll('*').remove();
@@ -507,7 +696,45 @@
 	}
 
 	function renderNotesForSystem(draw, systemIndex, startBarIndex, endBarIndex, notes) {
-		for (const noteData of notes) {
+		// First, ensure all notes have barIndex calculated (for those with only noteIndex)
+		const context = createRenderContext();
+
+		// Critical step: Sort notes by noteIndex to ensure proper ordering
+		const sortedNotes = [...notes].sort((a, b) => {
+			// If both have noteIndex, sort by that
+			if (a.noteIndex !== undefined && b.noteIndex !== undefined) {
+				return a.noteIndex - b.noteIndex;
+			}
+			// If only one has noteIndex, prioritize it
+			if (a.noteIndex !== undefined) return -1;
+			if (b.noteIndex !== undefined) return 1;
+			// Fall back to traditional ordering if no noteIndex
+			return 0;
+		});
+
+		// Calculate barIndex for all notes with noteIndex
+		const updatedNotes = sortedNotes.map((note) => {
+			if (note.barIndex === undefined && note.noteIndex !== undefined) {
+				const { barIndex, positionInBar } = calculateBarFromNoteIndex(
+					note.noteIndex,
+					sortedNotes,
+					context.currentTimeSignature
+				);
+				return { ...note, barIndex, position: positionInBar };
+			}
+			return note;
+		});
+
+		// Next, sort notes again by barIndex, then by position within the bar
+		const sortedForRendering = [...updatedNotes].sort((a, b) => {
+			if (a.barIndex !== b.barIndex) {
+				return a.barIndex - b.barIndex;
+			}
+			// Within the same bar, sort by position
+			return a.position - b.position;
+		});
+
+		for (const noteData of sortedForRendering) {
 			// Only render notes that belong to bars in this system
 			if (noteData.barIndex >= startBarIndex && noteData.barIndex < endBarIndex) {
 				// Calculate the relative bar index within this system
@@ -520,119 +747,66 @@
 					direction: noteData.direction,
 					rest: noteData.rest,
 					position: noteData.position,
-					startTime: noteData.startTime
+					startTime: noteData.startTime,
+					noteIndex: noteData.noteIndex
 				});
 			}
 		}
 	}
 
-	// Note Management
-	function addNote(noteData, existingNotes, context) {
-		const { barCount, currentTimeSignature, direction, rest } = context;
-
-		// Validate bar index
-		if (noteData.barIndex < 0 || noteData.barIndex >= barCount) {
-			console.error(`Bar index ${noteData.barIndex} is out of range (0-${barCount - 1})`);
-			return existingNotes;
-		}
-
-		// Calculate the start time if not provided
-		let startTime = noteData.startTime;
-
-		// If no explicit start time is provided, calculate it based on existing notes in the bar
-		if (startTime === undefined) {
-			const { startTime: calculatedStartTime } = calculateNoteStartTimeAndPosition(
-				noteData.barIndex,
-				existingNotes,
-				currentTimeSignature
-			);
-			startTime = calculatedStartTime;
-		}
-
-		// Get the duration of the current note from the config
-		const noteDuration = noteData.rest
-			? REST_CONFIG[noteData.duration]?.duration || 0
-			: NOTE[noteData.direction || direction][noteData.duration]?.duration || 0;
-
-		// Validate that the note fits within the bar's duration
-		const barDuration = currentTimeSignature.duration;
-		if (startTime + noteDuration > barDuration) {
-			console.warn(
-				`Note exceeds bar duration. Bar: ${noteData.barIndex}, Start: ${startTime}, Duration: ${noteDuration}, Bar Duration: ${barDuration}`
-			);
-			// You might want to handle this case (e.g., truncate the note, split it across bars, etc.)
-		}
-
-		// Calculate position as a normalized value (0-1) within the bar based on start time
-		const position = startTime / barDuration;
-
-		// Create the new note
-		const newNote = {
-			barIndex: noteData.barIndex,
-			note: noteData.note,
-			duration: noteData.duration,
-			direction: noteData.direction || direction,
-			rest: noteData.rest !== undefined ? noteData.rest : rest,
-			position,
-			startTime
-		};
-
-		// Return the updated notes array
-		return [...existingNotes, newNote];
-	}
-
-	function addMultipleNotes(notesData, existingNotes) {
-		const context = createRenderContext();
-		let updatedNotes = [...existingNotes];
-
-		for (const noteData of notesData) {
-			updatedNotes = addNote(noteData, updatedNotes, context);
-		}
-
-		return updatedNotes;
-	}
-
-	// Function to adjust notes when clef changes
-	function adjustNotesForClefChange(oldClef, newClef) {
-		if (!oldClef || !newClef || oldClef === newClef) return;
-
-		// No need to modify the actual note names
-		// We just need to re-render the staff with the new clef
-		// The visual position of the notes will automatically adjust based on the new clef
-		if (svg) {
-			renderStaff(svg, createRenderContext());
-		}
-	}
-
-	// Context Creation
-	function createRenderContext() {
-		return {
-			svg,
-			systemCount,
+	// Note Position Calculation
+	function calculateNotePosition(barIndex, position, context) {
+		const {
 			barsPerSystem,
-			barCount,
-			radius,
-			verticalPadding,
-			staffHeight,
-			config,
 			startPadding,
 			firstBarWidth,
 			regularBarWidth,
-			endPadding,
-			currentClef,
-			currentKeySignature,
-			currentTimeSignature,
-			scaledFontSize,
-			SVG_WIDTH,
-			scoreNotes,
-			direction,
-			rest
-		};
+			radius,
+			verticalPadding,
+			staffHeight,
+			config
+		} = context;
+
+		// Find which system the bar belongs to
+		const systemIndex = Math.floor(barIndex / barsPerSystem);
+
+		// Calculate the relative bar index within the system
+		const systemRelativeBarIndex = barIndex - systemIndex * barsPerSystem;
+
+		// Calculate the starting X position of the bar
+		let barStartX = startPadding;
+		if (systemRelativeBarIndex > 0) {
+			barStartX += firstBarWidth + (systemRelativeBarIndex - 1) * regularBarWidth;
+		}
+
+		// Get the width of the current bar
+		const barWidth = systemRelativeBarIndex === 0 ? firstBarWidth : regularBarWidth;
+
+		// Position within the bar based on position parameter (0-1)
+		const barPadding = radius * 0.5; // Padding from bar lines
+		const usableBarWidth = barWidth - barPadding * 2; // Width available for notes
+
+		// Calculate the x position with padding
+		const xPos = barStartX + barPadding + position * usableBarWidth;
+
+		// Calculate the y-start position for the system
+		const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
+
+		return { xPos, yStart, systemIndex, systemRelativeBarIndex };
 	}
 
-	// --- REACTIVE UPDATES ---
-	$: if (svg && (barCount || SVG_WIDTH || keySignature || timeSignature || radius)) {
-		renderStaff(svg, createRenderContext());
+	// Note Symbol Retrieval
+	function getNoteSymbol(noteConfig, noteConfig_params) {
+		const { REST_CONFIG, NOTE } = noteConfig_params;
+
+		if (noteConfig.rest) {
+			const restCode = REST_CONFIG[noteConfig.duration]?.code || '';
+			return String.fromCodePoint(parseInt(restCode.replace('U+', ''), 16));
+		} else {
+			const noteDirection = noteConfig.direction || 'down';
+			const noteCode = NOTE[noteDirection]?.[noteConfig.duration]?.code || '';
+			return String.fromCodePoint(parseInt(noteCode.replace('U+', ''), 16));
+		}
 	}
 </script>
 

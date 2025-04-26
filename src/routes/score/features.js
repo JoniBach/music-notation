@@ -209,7 +209,7 @@ export const createFeatures = (
 
 		// Position within the bar based on startTime/position
 		// Calculate the x position directly based on the bar start and the note's position within the bar
-		const barPadding = radius * 0.5; // Padding from bar lines
+		const barPadding = radius ; // Padding from bar lines
 		const usableBarWidth = barWidth - barPadding * 2; // Width available for notes
 
 		// Ensure position is used directly from noteData, with a fallback to 0.5
@@ -217,15 +217,22 @@ export const createFeatures = (
 		const position = typeof noteData.position === 'number' ? noteData.position : 0.5;
 
 		// Calculate the x position with padding
-		const xPos = barStartX + barPadding + position * usableBarWidth;
+		const xPos = barStartX + barPadding  + position * usableBarWidth + radius * 0.5;
 
 		// Calculate vertical position based on the note
 		const yPos = yStart + calculateStaffPosition(getNotePosition(noteData.note, NOTES, currentClef), radius);
 
-		// Debug positioning
-		console.log(
-			`Rendering note ${noteData.note} at position ${position} (x: ${xPos}, y: ${yPos})`
-		);
+		// Create a group for the note to make it easier to add additional elements
+		const noteGroup = group.append('g')
+			.attr('class', 'note')
+			.attr('transform', `translate(${xPos}, ${yPos})`)
+			.attr('data-bar-index', barIndex)
+			.attr('data-position', position);
+
+		// Add noteIndex as a data attribute if it exists
+		if (noteData.noteIndex !== undefined) {
+			noteGroup.attr('data-note-index', noteData.noteIndex);
+		}
 
 		let noteSymbol;
 		if (noteData.rest) {
@@ -237,14 +244,22 @@ export const createFeatures = (
 			noteSymbol = String.fromCodePoint(parseInt(noteCode.replace('U+', ''), 16));
 		}
 
-		group
-			.append('text')
-			.attr('class', 'note')
-			.attr('x', xPos)
-			.attr('y', yPos)
-			.attr('text-anchor', 'middle')
+		// Add the note symbol
+		noteGroup.append('text')
 			.attr('class', 'smuFL-symbol')
+			.attr('text-anchor', 'middle')
 			.style('font-size', `${scaledFontSize}px`)
 			.text(noteSymbol);
-	}
+
+		// // Optionally add a debug label showing the noteIndex
+		// if (noteData.noteIndex !== undefined) {
+		// 	noteGroup.append('text')
+		// 		.attr('dy', -radius * 2.5)
+		// 		.attr('text-anchor', 'middle')
+		// 		.attr('class', 'note-index-debug')
+		// 		.style('font-size', `${radius * 1.2}px`)
+		// 		.style('fill', '#666')
+		// 		.text(`#${noteData.noteIndex}`);
+		// }
+	},
 });
