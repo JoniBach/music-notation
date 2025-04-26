@@ -257,15 +257,6 @@ export const createFeatures = (
 			.style('font-size', `${scaledFontSize}px`)
 			.text(noteSymbol);
 
-		// // Optionally add a debug label showing the noteIndex
-		// if (noteData.noteIndex !== undefined) {
-		// 	noteGroup.append('text')
-		// 		.attr('dy', -radius * 2.5)
-		// 		.attr('text-anchor', 'middle')
-		// 		.attr('class', 'note-index-debug')
-		// 		.style('font-size', `${radius * 1.2}px`)
-		// 		.style('fill', '#666')
-		// 		.text(`#${noteData.noteIndex}`);
-		// }
+	
 	},
 });

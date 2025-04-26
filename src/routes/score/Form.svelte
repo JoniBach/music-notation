@@ -22,11 +22,55 @@
 		rest = $bindable(),
 		barCount = $bindable(),
 		radius = $bindable(),
-		bpm = $bindable()
+		bpm = $bindable(),
+		playing = $bindable(),
+		reverse = $bindable(),
+		cursorPosition = $bindable()
 	} = $props();
 </script>
 
 <div class="sidebar">
+	<p class="headder">
+		Playback:
+
+		<span class="headder-symbol">{!playing ? '⏸️' : '▶️'}</span>
+		<span class="headder-symbol">{bpm}bpm</span>
+		<span class="headder-symbol">{cursorPosition}</span>
+	</p>
+
+	<div class="input-group">
+		<label class="label" for="bpmRange">BPM</label>
+		<input
+			class="input"
+			id="bpmRange"
+			type="range"
+			min="60"
+			max="240"
+			bind:value={bpm}
+			aria-label="Beats per minute"
+		/>
+		<span class="value">{bpm}</span>
+	</div>
+
+	<div class="input-group">
+		<button onclick={() => (cursorPosition = 0)} aria-label="Reset to beginning"> {' |◀'} </button>
+
+		<button
+			onclick={() => (playing = !playing)}
+			aria-label={playing ? 'Pause playback' : 'Start playback'}
+		>
+			{playing ? '■ ' : '▶ '}
+		</button>
+		<button onclick={() => (reverse = !reverse)} aria-label="Reverse playback">
+			{reverse ? '◀◀' : '▶▶'}</button
+		>
+		<button onclick={() => (cursorPosition = barCount)} aria-label="Reset to end">
+			{'▶ |'}
+		</button>
+	</div>
+
+	<hr />
+
 	<p class="headder">
 		Score
 		<span class="clef">
@@ -125,20 +169,6 @@
 			aria-label="Note radius"
 		/>
 		<span class="value">{radius}</span>
-	</div>
-
-	<div class="input-group">
-		<label class="label" for="bpmRange">BPM</label>
-		<input
-			class="input"
-			id="bpmRange"
-			type="range"
-			min="60"
-			max="240"
-			bind:value={bpm}
-			aria-label="Beats per minute"
-		/>
-		<span class="value">{bpm}</span>
 	</div>
 
 	<hr />
@@ -259,5 +289,8 @@
 		text-align: center;
 		vertical-align: middle;
 		align-content: center;
+	}
+	.headder-symbol {
+		margin-left: 2px;
 	}
 </style>
