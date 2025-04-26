@@ -70,7 +70,8 @@
 	$: startPadding = 0;
 	$: endPadding = 0;
 	$: verticalPadding = padding * 2;
-	$: firstBarExtraWidth = radius * (4 + accidentalsCount);
+	$: keyTimeSigExtraPadding = radius * 2; // Added extra padding for bars with key/time signatures
+	$: firstBarExtraWidth = radius * (4 + accidentalsCount) + keyTimeSigExtraPadding;
 	$: minBarWidth = radius * 12;
 	$: availableWidth = SVG_WIDTH - startPadding - endPadding;
 	$: barsPerSystem = Math.max(1, Math.floor((availableWidth - firstBarExtraWidth) / minBarWidth));

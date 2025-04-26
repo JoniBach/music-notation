@@ -209,15 +209,21 @@ export const createFeatures = (
 
 		// Position within the bar based on startTime/position
 		// Calculate the x position directly based on the bar start and the note's position within the bar
-		const barPadding = radius ; // Padding from bar lines
-		const usableBarWidth = barWidth - barPadding * 2; // Width available for notes
+		const standardBarPadding = radius; // Standard padding from bar lines
+		
+		// Add extra padding for first bar of each system (where key/time signatures are)
+		const isFirstBar = barIndex === 0;
+		const extraPadding = isFirstBar ? radius * 8 : 0; // Increased padding from 4 to 8 for bars with key/time signatures
+		const barPadding = standardBarPadding + extraPadding;
+		
+		const usableBarWidth = barWidth - (isFirstBar ? barPadding + standardBarPadding : standardBarPadding * 2); // Width available for notes
 
 		// Ensure position is used directly from noteData, with a fallback to 0.5
 		// This ensures notes are placed exactly where specified
 		const position = typeof noteData.position === 'number' ? noteData.position : 0.5;
 
 		// Calculate the x position with padding
-		const xPos = barStartX + barPadding  + position * usableBarWidth + radius * 0.5;
+		const xPos = barStartX + barPadding + position * usableBarWidth + radius * 0.5;
 
 		// Calculate vertical position based on the note
 		const yPos = yStart + calculateStaffPosition(getNotePosition(noteData.note, NOTES, currentClef), radius);
