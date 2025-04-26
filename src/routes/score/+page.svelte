@@ -17,8 +17,6 @@
 	} from './config';
 	import { createFeatures, calculateStaffPosition, getNotePosition } from './features';
 
-	// --- STATE ---
-	// User-configurable state
 	let keySignature = 'c_major_a_minor';
 	let timeSignature = '4_4_common_time';
 	let clef = 'treble';
@@ -26,34 +24,29 @@
 	let direction = 'down';
 	let rest = false;
 	let barCount = 12;
-	let radius = 10; // Base radius unit for staff notation
-	let scoreNotes = []; // Store notes in a structured format
+	let radius = 10;
+	let scoreNotes = [];
 
-	// Track previous clef to detect changes
 	let previousClef = clef;
 
-	// DOM references
 	let container;
 	let svg = null;
-	let ghostNote = null; // Reference to the ghost note element
+	let ghostNote = null;
 
-	// Dimensions and layout
 	let SVG_WIDTH = 400;
 
-	// Ghost note state
 	const ghostNoteState = {
 		note: 'C4',
 		duration: 'quarter',
 		direction: 'down',
 		rest: false,
 		noteIndex: 0,
-		barIndex: 0, // Keep this for backward compatibility
+		barIndex: 0,
 		systemIndex: 0,
 		position: 0.5,
 		visible: false
 	};
 
-	// --- CONFIGURATION ---
 	const config = {
 		staffLines: 5,
 		staffLineColor: '#000',
@@ -62,26 +55,23 @@
 		systemMarginTop: radius * 5
 	};
 
-	// --- DERIVED VALUES ---
-	$: scaledFontSize = radius * 4; // Scale font size based on radius
+	$: scaledFontSize = radius * 4;
 	$: currentKeySignature = KEY_SIGNATURE[keySignature];
 	$: currentClef = CLEF[clef];
 	$: currentTimeSignature = TIME_SIGNATURE[timeSignature];
 	$: accidentalsCount = Math.max(currentKeySignature.sharps, currentKeySignature.flats);
 
-	// Watch for clef changes and adjust notes accordingly
 	$: if (svg && clef !== previousClef && scoreNotes.length > 0) {
 		adjustNotesForClefChange(previousClef, clef);
 		previousClef = clef;
 	}
 
-	// Layout calculations
-	$: padding = radius * 2; // Basic padding for layout
+	$: padding = radius * 2;
 	$: startPadding = 0;
 	$: endPadding = 0;
 	$: verticalPadding = padding * 2;
-	$: firstBarExtraWidth = radius * (4 + accidentalsCount); // Space for clef, key signature, etc.
-	$: minBarWidth = radius * 12; // Minimum width per bar
+	$: firstBarExtraWidth = radius * (4 + accidentalsCount);
+	$: minBarWidth = radius * 12;
 	$: availableWidth = SVG_WIDTH - startPadding - endPadding;
 	$: barsPerSystem = Math.max(1, Math.floor((availableWidth - firstBarExtraWidth) / minBarWidth));
 	$: systemCount = Math.ceil(barCount / barsPerSystem);
@@ -91,23 +81,18 @@
 	$: staffHeight = (config.staffLines - 1) * radius;
 	$: TOTAL_HEIGHT = verticalPadding * 2 + systemCount * (staffHeight + config.systemMarginTop);
 
-	// --- LIFECYCLE HANDLERS ---
 	onMount(() => {
 		if (!browser) return;
 
-		// Initialize SVG container
 		svg = createSvgContainer('#staff-container', SVG_WIDTH, TOTAL_HEIGHT);
 
-		// Create a ghost note group
 		ghostNote = createGhostNoteGroup(svg);
 
 		handleResize();
 		window.addEventListener('resize', handleResize);
 
-		// Add example notes
 		scoreNotes = [];
 
-		// Add notes with noteIndex instead of barIndex
 		const exampleNotes = [
 			{ noteIndex: 0, note: 'A4', duration: 'half' },
 			{ noteIndex: 1, note: 'B4', duration: 'quarter' },
@@ -119,7 +104,6 @@
 		scoreNotes = addMultipleNotes(exampleNotes, scoreNotes);
 		renderStaff(svg, createRenderContext());
 
-		// Set up event listeners
 		const cleanupListeners = setupEventListeners('#staff-container');
 
 		return () => {
@@ -130,9 +114,6 @@
 
 	$: console.log(scoreNotes);
 
-	// --- PURE FUNCTIONS ---
-
-	// SVG Creation
 	function createSvgContainer(selector, width, height) {
 		return d3.select(selector).append('svg').attr('width', width).attr('height', height);
 	}
@@ -141,7 +122,6 @@
 		return svg.append('g').attr('class', 'ghost-note').style('opacity', 0);
 	}
 
-	// Event Handling
 	function setupEventListeners(selector) {
 		const staffContainer = d3.select(selector);
 
@@ -188,7 +168,6 @@
 		}
 
 		const barInfo = getBarFromX(mousePosition.x, systemInfo.index, context);
-
 		if (!barInfo.valid) {
 			ghostNoteState.visible = false;
 			updateGhostNote(ghostNote, ghostNoteState, context);
@@ -198,10 +177,21 @@
 		const staffPosition = calculateStaffPositionFromY(mousePosition.y, systemInfo.index, context);
 		const closestNote = findClosestNote(staffPosition, NOTES, currentClef);
 
-		// Calculate the noteIndex based on existing notes and position
-		const nextNoteIndex = calculateNextNoteIndex(context.scoreNotes);
+		const existingNote = findExistingNoteAtPosition(
+			mousePosition.x,
+			systemInfo.index,
+			context.scoreNotes,
+			context
+		);
 
-		// Update ghost note state with both noteIndex and barIndex for compatibility
+		let nextNoteIndex;
+
+		if (existingNote) {
+			nextNoteIndex = existingNote.noteIndex;
+		} else {
+			nextNoteIndex = calculateNextNoteIndex(context.scoreNotes);
+		}
+
 		ghostNoteState.note = closestNote;
 		ghostNoteState.barIndex = barInfo.index;
 		ghostNoteState.noteIndex = nextNoteIndex;
@@ -215,49 +205,6 @@
 		updateGhostNote(ghostNote, ghostNoteState, context);
 	}
 
-	// Helper function to calculate next available noteIndex
-	function calculateNextNoteIndex(notes) {
-		if (!notes || notes.length === 0) return 0;
-		const existingIndices = notes.filter((n) => n.noteIndex !== undefined).map((n) => n.noteIndex);
-		return existingIndices.length > 0 ? Math.max(...existingIndices) + 1 : 0;
-	}
-
-	function handleStaffClick(event) {
-		if (!svg) return;
-
-		const context = createRenderContext();
-		const mousePosition = getMousePosition(event, svg.node());
-		const systemInfo = getSystemFromY(mousePosition.y, context);
-
-		if (!systemInfo.valid) return;
-
-		const barInfo = getBarFromX(mousePosition.x, systemInfo.index, context);
-		if (!barInfo.valid) return;
-
-		const staffPosition = calculateStaffPositionFromY(mousePosition.y, systemInfo.index, context);
-		const closestNote = findClosestNote(staffPosition, NOTES, currentClef);
-
-		// Get the next available noteIndex
-		const nextNoteIndex = calculateNextNoteIndex(scoreNotes);
-
-		// Add the note using noteIndex instead of barIndex
-		scoreNotes = addNote(
-			{
-				noteIndex: nextNoteIndex,
-				note: closestNote,
-				duration: note,
-				direction,
-				rest
-			},
-			scoreNotes,
-			context
-		);
-
-		// Re-render the staff
-		renderStaff(svg, createRenderContext());
-	}
-
-	// Mouse Position Utilities
 	function getMousePosition(event, svgElement) {
 		const svgRect = svgElement.getBoundingClientRect();
 		return {
@@ -310,7 +257,6 @@
 		return Math.round((radius * 2 - yRelativeToStaff) / (radius / 2));
 	}
 
-	// Note Finding and Calculation
 	function findClosestNote(staffPosition, NOTES, currentClef) {
 		const noteEntries = Object.entries(NOTES);
 		let closestNote = noteEntries[0][0];
@@ -330,38 +276,46 @@
 		return closestNote;
 	}
 
-	// Calculate which bar a note belongs to based on noteIndex and note durations
 	function calculateBarFromNoteIndex(noteIndex, notes, timeSignature) {
-		// Get the total accumulated duration up to this note
 		let totalDuration = 0;
 		if (!notes || notes.length === 0) return { barIndex: 0, positionInBar: 0, totalDuration: 0 };
 
-		const sortedNotes = [...notes].sort((a, b) => (a.noteIndex || 0) - (b.noteIndex || 0));
+		const sortedNotes = [...notes].sort((a, b) => {
+			if (a.noteIndex !== undefined && b.noteIndex !== undefined) {
+				return a.noteIndex - b.noteIndex;
+			}
+			return 0;
+		});
 
-		// Only calculate for notes before current noteIndex
-		const precedingNotes = sortedNotes.filter((n) => (n.noteIndex || 0) < noteIndex);
+		const uniqueIndices = [...new Set(sortedNotes.map((n) => n.noteIndex || 0))].filter(
+			(idx) => idx < noteIndex
+		);
 
-		for (const note of precedingNotes) {
-			// Get duration from the config based on note type
-			const noteDuration = note.rest
-				? REST_CONFIG[note.duration]?.duration || 0
-				: NOTE[note.direction || 'down'][note.duration]?.duration || 0;
+		for (const idx of uniqueIndices) {
+			const notesWithThisIndex = sortedNotes.filter((n) => (n.noteIndex || 0) === idx);
 
-			totalDuration += noteDuration;
+			let maxDuration = 0;
+
+			for (const note of notesWithThisIndex) {
+				const noteDuration = note.rest
+					? REST_CONFIG[note.duration]?.duration || 0
+					: NOTE[note.direction || 'down'][note.duration]?.duration || 0;
+
+				maxDuration = Math.max(maxDuration, noteDuration);
+			}
+
+			totalDuration += maxDuration;
 		}
 
-		// Calculate bar index based on time signature's bar duration
 		const barDuration = timeSignature.duration;
 		const barIndex = Math.floor(totalDuration / barDuration);
 
-		// Calculate position within the bar (0-1)
 		const positionInBar = (totalDuration % barDuration) / barDuration;
 
 		return { barIndex, positionInBar, totalDuration };
 	}
 
 	function calculateNoteStartTimeAndPosition(barIndex, notes, timeSignature, noteIndex = null) {
-		// If using noteIndex, calculate bar and position from the note's index
 		if (noteIndex !== null) {
 			const result = calculateBarFromNoteIndex(noteIndex, notes, timeSignature);
 			return {
@@ -371,23 +325,16 @@
 			};
 		}
 
-		// Legacy code for calculating based on barIndex - keep for backward compatibility
-		// Get the current time signature's total duration for the bar
 		const barDuration = timeSignature.duration;
 
-		// Important: Sort notes by noteIndex first if available
 		const sortedNotes = [...notes].sort((a, b) => {
-			// If both have noteIndex, sort by noteIndex
 			if (a.noteIndex !== undefined && b.noteIndex !== undefined) {
 				return a.noteIndex - b.noteIndex;
 			}
-			// Otherwise use default array ordering (for backwards compatibility)
 			return 0;
 		});
 
-		// Find all notes in the current bar
 		const notesInBar = sortedNotes.filter((n) => {
-			// If note has noteIndex, calculate its bar first
 			if (n.noteIndex !== undefined && n.barIndex === undefined) {
 				const { barIndex: calculatedBarIndex } = calculateBarFromNoteIndex(
 					n.noteIndex || 0,
@@ -399,45 +346,34 @@
 			return n.barIndex === barIndex;
 		});
 
-		// Calculate the start time for the new note
 		let startTime = 0;
 		if (notesInBar.length > 0) {
-			// Find the latest end time of notes in this bar
 			let latestEndTime = 0;
 			for (const note of notesInBar) {
-				// Get the duration from the config based on the note type
 				const noteDuration = note.rest
 					? REST_CONFIG[note.duration]?.duration || 0
 					: NOTE[note.direction][note.duration]?.duration || 0;
 
-				// Calculate when this note ends
 				const noteEndTime = note.startTime + noteDuration;
 
-				// Keep track of the latest end time
 				latestEndTime = Math.max(latestEndTime, noteEndTime);
 			}
 
-			// The new note starts at the latest end time
 			startTime = latestEndTime;
 		}
 
-		// Calculate position as a normalized value (0-1) within the bar based on start time
 		const position = startTime / barDuration;
 
 		return { startTime, position, barIndex };
 	}
 
-	// Note Management
 	function addNote(noteData, existingNotes, context) {
 		const { barCount, currentTimeSignature, direction, rest } = context;
 
-		// Determine if we're using noteIndex or barIndex
-		const usingNoteIndex = noteData.noteIndex !== undefined;
 		let barIndex = noteData.barIndex;
 		let startTime, position, totalDuration;
 
-		// If using noteIndex, calculate the bar position
-		if (usingNoteIndex) {
+		if (noteData.noteIndex !== undefined) {
 			const result = calculateBarFromNoteIndex(
 				noteData.noteIndex,
 				existingNotes,
@@ -447,13 +383,11 @@
 			position = result.positionInBar;
 			startTime = result.totalDuration;
 		} else {
-			// Validate bar index for traditional approach
 			if (barIndex < 0 || barIndex >= barCount) {
 				console.error(`Bar index ${barIndex} is out of range (0-${barCount - 1})`);
 				return existingNotes;
 			}
 
-			// If no explicit start time is provided, calculate it based on existing notes in the bar
 			if (noteData.startTime === undefined) {
 				const result = calculateNoteStartTimeAndPosition(
 					barIndex,
@@ -468,23 +402,19 @@
 			}
 		}
 
-		// Get the duration of the current note from the config
 		const noteDuration = noteData.rest
 			? REST_CONFIG[noteData.duration]?.duration || 0
 			: NOTE[noteData.direction || direction][noteData.duration]?.duration || 0;
 
-		// Validate that the note fits within overall bar count
 		if (barIndex >= barCount) {
 			console.warn(
 				`Note exceeds total bar count. Calculated Bar: ${barIndex}, Max Bars: ${barCount - 1}`
 			);
-			// Optionally handle this (adjust bar count, truncate, etc.)
 		}
 
-		// Create the new note
 		const newNote = {
-			noteIndex: noteData.noteIndex, // Store the noteIndex if it exists
-			barIndex, // Store calculated barIndex
+			noteIndex: noteData.noteIndex,
+			barIndex,
 			note: noteData.note,
 			duration: noteData.duration,
 			direction: noteData.direction || direction,
@@ -493,7 +423,6 @@
 			startTime
 		};
 
-		// Return the updated notes array
 		return [...existingNotes, newNote];
 	}
 
@@ -501,13 +430,10 @@
 		const context = createRenderContext();
 		let updatedNotes = [...existingNotes];
 
-		// Sort the notesData by noteIndex to ensure ordering is consistent
 		const sortedNotesData = [...notesData].sort((a, b) => {
-			// If both have noteIndex, sort by noteIndex
 			if (a.noteIndex !== undefined && b.noteIndex !== undefined) {
 				return a.noteIndex - b.noteIndex;
 			}
-			// Default ordering
 			return 0;
 		});
 
@@ -518,19 +444,14 @@
 		return updatedNotes;
 	}
 
-	// Function to adjust notes when clef changes
 	function adjustNotesForClefChange(oldClef, newClef) {
 		if (!oldClef || !newClef || oldClef === newClef) return;
 
-		// No need to modify the actual note names
-		// We just need to re-render the staff with the new clef
-		// The visual position of the notes will automatically adjust based on the new clef
 		if (svg) {
 			renderStaff(svg, createRenderContext());
 		}
 	}
 
-	// Context Creation
 	function createRenderContext() {
 		return {
 			svg,
@@ -556,64 +477,51 @@
 		};
 	}
 
-	// --- REACTIVE UPDATES ---
 	$: if (svg && (barCount || SVG_WIDTH || keySignature || timeSignature || radius)) {
 		renderStaff(svg, createRenderContext());
 	}
 
-	// Ghost Note Rendering
 	function updateGhostNote(ghostNote, ghostNoteState, context) {
 		if (!ghostNote) return;
 
-		// If not visible, hide the ghost note
 		if (!ghostNoteState.visible) {
 			ghostNote.style('opacity', 0);
 			return;
 		}
 
-		// Calculate position
 		const { note, barIndex, position, duration, direction, rest, noteIndex } = ghostNoteState;
 
-		// First check if we have noteIndex - if so, use that for positioning
 		let xPos, yStart;
 
-		// If we have a noteIndex, calculate position based on our noteIndex algorithm
 		if (noteIndex !== undefined) {
-			// Get the note's position based on the noteIndex
 			const positionInfo = calculateBarFromNoteIndex(
 				noteIndex,
 				context.scoreNotes,
 				context.currentTimeSignature
 			);
 
-			// Use the calculated bar index and position
 			const calculatedPosition = calculateNotePosition(
 				positionInfo.barIndex,
 				positionInfo.positionInBar,
 				context
 			);
 
-			xPos = calculatedPosition.xPos + context.radius * 0.5; // Add same offset as in features.js
+			xPos = calculatedPosition.xPos + context.radius * 0.5;
 			yStart = calculatedPosition.yStart;
 		} else {
-			// Fallback to direct barIndex and position if no noteIndex
 			const calculatedPosition = calculateNotePosition(barIndex, position, context);
-			xPos = calculatedPosition.xPos + context.radius * 0.5; // Add same offset as in features.js
+			xPos = calculatedPosition.xPos + context.radius * 0.5;
 			yStart = calculatedPosition.yStart;
 		}
 
-		// Calculate vertical position based on the note
 		const yPos =
 			yStart +
 			calculateStaffPosition(getNotePosition(note, NOTES, context.currentClef), context.radius);
 
-		// Clear previous ghost note content
 		ghostNote.selectAll('*').remove();
 
-		// Add the note symbol
 		ghostNote.attr('transform', `translate(${xPos}, ${yPos})`).style('opacity', 0.6);
 
-		// Add the actual note symbol
 		ghostNote
 			.append('text')
 			.attr('class', 'smuFL-symbol')
@@ -623,27 +531,21 @@
 			.text(getNoteSymbol({ note, duration, direction, rest }, { REST_CONFIG, NOTE }));
 	}
 
-	// Staff Rendering
 	function renderStaff(svg, context) {
 		if (!svg) return;
 
-		// Clear existing elements
 		svg.selectAll('.staff-element').remove();
 
-		// Create a group for all staff elements
 		const staffGroup = svg.append('g').attr('class', 'staff-element');
 
-		// Render each system
 		for (let systemIndex = 0; systemIndex < context.systemCount; systemIndex++) {
 			renderSystem(staffGroup, systemIndex, context);
 		}
 	}
 
 	function renderSystem(staffGroup, systemIndex, context) {
-		// Create a system group
 		const systemGroup = staffGroup.append('g').attr('class', `system-${systemIndex}`);
 
-		// Create drawing features
 		const draw = createFeatures(systemGroup, {
 			radius: context.radius,
 			verticalPadding: context.verticalPadding,
@@ -666,49 +568,36 @@
 			NOTES
 		});
 
-		// Calculate which bars belong to this system
 		const startBarIndex = systemIndex * context.barsPerSystem;
 		const endBarIndex = Math.min(startBarIndex + context.barsPerSystem, context.barCount);
 		const barsInSystem = endBarIndex - startBarIndex;
 
-		// Draw clef, key signature, and time signature
 		draw.clef(systemIndex);
 		draw.keySignature(systemIndex);
 		draw.timeSignature(systemIndex);
 
-		// Draw staff lines
 		for (let lineIndex = 0; lineIndex < context.config.staffLines; lineIndex++) {
 			draw.staffLine(systemIndex, lineIndex, barsInSystem);
 		}
 
-		// Draw Barlines
 		draw.barLine(systemIndex, 0, true);
 		for (let barIndex = 1; barIndex <= barsInSystem; barIndex++) {
 			draw.barLine(systemIndex, barIndex, barIndex === barsInSystem);
 		}
 
-		// Render notes for this system
 		renderNotesForSystem(draw, systemIndex, startBarIndex, endBarIndex, context.scoreNotes);
 	}
 
 	function renderNotesForSystem(draw, systemIndex, startBarIndex, endBarIndex, notes) {
-		// First, ensure all notes have barIndex calculated (for those with only noteIndex)
 		const context = createRenderContext();
 
-		// Critical step: Sort notes by noteIndex to ensure proper ordering
 		const sortedNotes = [...notes].sort((a, b) => {
-			// If both have noteIndex, sort by that
 			if (a.noteIndex !== undefined && b.noteIndex !== undefined) {
 				return a.noteIndex - b.noteIndex;
 			}
-			// If only one has noteIndex, prioritize it
-			if (a.noteIndex !== undefined) return -1;
-			if (b.noteIndex !== undefined) return 1;
-			// Fall back to traditional ordering if no noteIndex
 			return 0;
 		});
 
-		// Calculate barIndex for all notes with noteIndex
 		const updatedNotes = sortedNotes.map((note) => {
 			if (note.barIndex === undefined && note.noteIndex !== undefined) {
 				const { barIndex, positionInBar } = calculateBarFromNoteIndex(
@@ -721,22 +610,17 @@
 			return note;
 		});
 
-		// Next, sort notes again by barIndex, then by position within the bar
 		const sortedForRendering = [...updatedNotes].sort((a, b) => {
 			if (a.barIndex !== b.barIndex) {
 				return a.barIndex - b.barIndex;
 			}
-			// Within the same bar, sort by position
 			return a.position - b.position;
 		});
 
 		for (const noteData of sortedForRendering) {
-			// Only render notes that belong to bars in this system
 			if (noteData.barIndex >= startBarIndex && noteData.barIndex < endBarIndex) {
-				// Calculate the relative bar index within this system
 				const systemRelativeBarIndex = noteData.barIndex - startBarIndex;
 
-				// Ensure all properties are passed correctly
 				draw.note(systemIndex, systemRelativeBarIndex, {
 					note: noteData.note,
 					duration: noteData.duration,
@@ -750,7 +634,6 @@
 		}
 	}
 
-	// Note Position Calculation
 	function calculateNotePosition(barIndex, position, context) {
 		const {
 			barsPerSystem,
@@ -763,35 +646,27 @@
 			config
 		} = context;
 
-		// Find which system the bar belongs to
 		const systemIndex = Math.floor(barIndex / barsPerSystem);
 
-		// Calculate the relative bar index within the system
 		const systemRelativeBarIndex = barIndex - systemIndex * barsPerSystem;
 
-		// Calculate the starting X position of the bar
 		let barStartX = startPadding;
 		if (systemRelativeBarIndex > 0) {
 			barStartX += firstBarWidth + (systemRelativeBarIndex - 1) * regularBarWidth;
 		}
 
-		// Get the width of the current bar
 		const barWidth = systemRelativeBarIndex === 0 ? firstBarWidth : regularBarWidth;
 
-		// Position within the bar based on position parameter (0-1)
-		const barPadding = radius * 0.5; // Padding from bar lines
-		const usableBarWidth = barWidth - barPadding * 2; // Width available for notes
+		const barPadding = radius * 0.5;
+		const usableBarWidth = barWidth - barPadding * 2;
 
-		// Calculate the x position with padding
 		const xPos = barStartX + barPadding + position * usableBarWidth;
 
-		// Calculate the y-start position for the system
 		const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
 
 		return { xPos, yStart, systemIndex, systemRelativeBarIndex };
 	}
 
-	// Note Symbol Retrieval
 	function getNoteSymbol(noteConfig, noteConfig_params) {
 		const { REST_CONFIG, NOTE } = noteConfig_params;
 
@@ -803,6 +678,99 @@
 			const noteCode = NOTE[noteDirection]?.[noteConfig.duration]?.code || '';
 			return String.fromCodePoint(parseInt(noteCode.replace('U+', ''), 16));
 		}
+	}
+
+	function calculateNextNoteIndex(notes) {
+		if (!notes || notes.length === 0) return 0;
+		const existingIndices = notes.filter((n) => n.noteIndex !== undefined).map((n) => n.noteIndex);
+		return existingIndices.length > 0 ? Math.max(...existingIndices) + 1 : 0;
+	}
+
+	function findExistingNoteAtPosition(x, systemIndex, notes, context) {
+		const { startPadding, barsPerSystem, firstBarWidth, regularBarWidth } = context;
+		const xRelativeToSystem = x - startPadding;
+
+		const startBarIndex = systemIndex * barsPerSystem;
+		let barIndex;
+		let position;
+
+		if (xRelativeToSystem < firstBarWidth) {
+			barIndex = startBarIndex;
+			position = xRelativeToSystem / firstBarWidth;
+		} else {
+			const barOffset = Math.floor((xRelativeToSystem - firstBarWidth) / regularBarWidth) + 1;
+			barIndex = startBarIndex + barOffset;
+			position = ((xRelativeToSystem - firstBarWidth) % regularBarWidth) / regularBarWidth;
+		}
+
+		const matchingNotes = notes.filter((note) => {
+			let noteBarIndex = note.barIndex;
+			if (noteBarIndex === undefined && note.noteIndex !== undefined) {
+				const result = calculateBarFromNoteIndex(
+					note.noteIndex,
+					notes,
+					context.currentTimeSignature
+				);
+				noteBarIndex = result.barIndex;
+			}
+
+			const match = noteBarIndex === barIndex && Math.abs(note.position - position) < 0.1;
+			if (match) {
+				console.log(
+					`Found matching note at index ${note.noteIndex}, position=${note.position.toFixed(3)}`
+				);
+			}
+			return match;
+		});
+
+		return matchingNotes.length > 0 ? matchingNotes[0] : undefined;
+	}
+
+	function handleStaffClick(event) {
+		if (!svg) return;
+
+		const context = createRenderContext();
+		const mousePosition = getMousePosition(event, svg.node());
+		const systemInfo = getSystemFromY(mousePosition.y, context);
+
+		if (!systemInfo.valid) return;
+
+		const barInfo = getBarFromX(mousePosition.x, systemInfo.index, context);
+		if (!barInfo.valid) return;
+
+		const staffPosition = calculateStaffPositionFromY(mousePosition.y, systemInfo.index, context);
+		const closestNote = findClosestNote(staffPosition, NOTES, currentClef);
+
+		const existingNote = findExistingNoteAtPosition(
+			mousePosition.x,
+			systemInfo.index,
+			context.scoreNotes,
+			context
+		);
+
+		let nextNoteIndex;
+
+		if (existingNote) {
+			nextNoteIndex = existingNote.noteIndex;
+			console.log(`Using existing note index: ${nextNoteIndex}`);
+		} else {
+			nextNoteIndex = calculateNextNoteIndex(context.scoreNotes);
+			console.log(`Using new note index: ${nextNoteIndex}`);
+		}
+
+		scoreNotes = addNote(
+			{
+				noteIndex: nextNoteIndex,
+				note: closestNote,
+				duration: note,
+				direction,
+				rest
+			},
+			scoreNotes,
+			context
+		);
+
+		renderStaff(svg, createRenderContext());
 	}
 </script>
 
