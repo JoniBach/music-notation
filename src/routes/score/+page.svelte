@@ -32,6 +32,7 @@
 	let playing = false;
 	let reverse = false;
 	let cursorPosition = 0;
+	let accidental = 'natural';
 
 	let previousClef = clef;
 
@@ -335,14 +336,26 @@
 
 		const context = createRenderContext();
 		const mousePosition = getMousePosition(event, svg.node());
+		// const noteHasAccidental = Object.keys(NOTES).includes( ghostNoteState.note);
 
+		const noteWithAccidental =
+			accidental === 'natural'
+				? ghostNoteState.note
+				: ghostNoteState.note.charAt(0) +
+					(accidental === 'flat' ? 'b' : '#') +
+					ghostNoteState.note.substring(1);
+
+		const noteExists = Object.keys(NOTES).includes(noteWithAccidental);
+
+		console.log('noteWithAccidental', noteWithAccidental, noteExists);
 		if (ghostNoteState.visible) {
 			const newNote = {
 				noteIndex: ghostNoteState.noteIndex,
-				note: ghostNoteState.note,
+				note: noteExists ? noteWithAccidental : ghostNoteState.note,
 				duration: ghostNoteState.duration,
 				direction: ghostNoteState.direction,
-				rest: ghostNoteState.rest
+				rest: ghostNoteState.rest,
+				accidental: accidental
 			};
 
 			scoreNotes = addNote(newNote, scoreNotes, context);
@@ -403,7 +416,7 @@
 	}
 
 	function findClosestNote(staffPosition, NOTES, currentClef) {
-		const noteEntries = Object.entries(NOTES);
+		const noteEntries = Object.entries(NOTES).filter(([noteName]) => noteName.length <= 2); // remove sharps and flats
 		let closestNote = noteEntries[0][0];
 		let closestDistance = Math.abs(
 			getNotePosition(closestNote, NOTES, currentClef) - staffPosition
@@ -617,6 +630,7 @@
 			scaledFontSize,
 			SVG_WIDTH,
 			scoreNotes,
+			accidental,
 			direction,
 			rest
 		};
@@ -1185,6 +1199,7 @@
 		bind:playbackPercentage
 		bind:playbackMin
 		bind:playbackMax
+		bind:accidental
 	/>
 	<div class="staff-container" id="staff-container" bind:this={container}>
 		<!-- SVG container is appended here by D3 -->
@@ -1194,14 +1209,14 @@
 <style>
 	.score-container {
 		display: flex;
-		width: 100%;
+		width: 95%;
 		height: 100%;
 	}
 
 	.staff-container {
 		overflow: auto;
 		flex-grow: 1;
-		width: 100%;
+		margin-left: 5%;
 	}
 
 	:global(.smuFL-symbol) {

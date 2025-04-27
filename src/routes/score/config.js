@@ -25,6 +25,23 @@ export const TIME_SIGNATURE_IDS = [
 	'9_8_compound_triple'
 ];
 
+export const DIRECTION_IDS = ['down', 'up'];
+
+export const NOTE_IDS = [
+	'dotted_double',
+	'double',
+	'dotted_whole',
+	'whole',
+	'dotted_half',
+	'half',
+	'dotted_quarter',
+	'quarter',
+	'dotted_eighth',
+	'eighth',
+	'dotted_sixteenth',
+	'sixteenth'
+];
+
 export const CLEF = {
 	treble: {
 		root: 'G',
@@ -266,260 +283,371 @@ export const ACCIDENTAL_IDS = ['sharp', 'flat', 'natural'];
 export const ACCIDENTAL = {
 	sharp: 'U+E262', // accidentalSharp
 	flat: 'U+E260', // accidentalFlat
-	natural: 'U+E261' // accidentalNatural
+	natural: 'U+E261', // accidentalNatural
+	none: 'U+E261' // accidentalnone
 };
 
 export const NOTE = {
 	down: {
 		double: { name: 'Breave', description: 'Double Note', duration: 2, code: 'U+ECA0' },
+		dotted_double: {
+			name: 'Dotted Breave',
+			description: 'Dotted Double Note',
+			duration: 3,
+			code: 'U+ECA0'
+		},
 		whole: { name: 'Semibreve', description: 'Whole Note', duration: 1, code: 'U+ECA2' },
+		dotted_whole: {
+			name: 'Dotted Semibreve',
+			description: 'Dotted Whole Note',
+			duration: 1.5,
+			code: 'U+ECA2'
+		},
 		half: { name: 'Minim', description: 'Half Note', duration: 0.5, code: 'U+ECA4' },
+		dotted_half: {
+			name: 'Dotted Minim',
+			description: 'Dotted Half Note',
+			duration: 0.75,
+			code: 'U+ECA4'
+		},
 		quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 0.25, code: 'U+ECA6' },
+		dotted_quarter: {
+			name: 'Dotted Crotchet',
+			description: 'Dotted Quarter Note',
+			duration: 0.375,
+			code: 'U+ECA6'
+		},
 		eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0.125, code: 'U+ECA8' },
+		dotted_eighth: {
+			name: 'Dotted Quaver',
+			description: 'Dotted Eighth Note',
+			duration: 0.1875,
+			code: 'U+ECA8'
+		},
 		sixteenth: {
 			name: 'Semiquaver',
 			description: 'Sixteenth Note',
 			duration: 0.0625,
 			code: 'U+E1DA'
+		},
+		dotted_sixteenth: {
+			name: 'Dotted Semiquaver',
+			description: 'Dotted Sixteenth Note',
+			duration: 0.09375,
+			code: 'U+E1DA'
 		}
 	},
 	up: {
 		double: { name: 'Breave', description: 'Double Note', duration: 2, code: 'U+ECA0' },
+		dotted_double: {
+			name: 'Dotted Breave',
+			description: 'Dotted Double Note',
+			duration: 3,
+			code: 'U+ECA0'
+		},
 		whole: { name: 'Semibreve', description: 'Whole Note', duration: 1, code: 'U+ECA2' },
+		dotted_whole: {
+			name: 'Dotted Semibreve',
+			description: 'Dotted Whole Note',
+			duration: 1.5,
+			code: 'U+ECA2'
+		},
 		half: { name: 'Minim', description: 'Half Note', duration: 0.5, code: 'U+ECA3' },
+		dotted_half: {
+			name: 'Dotted Minim',
+			description: 'Dotted Half Note',
+			duration: 0.75,
+			code: 'U+ECA3'
+		},
 		quarter: { name: 'Crotchet', description: 'Quarter Note', duration: 0.25, code: 'U+ECA5' },
+		dotted_quarter: {
+			name: 'Dotted Crotchet',
+			description: 'Dotted Quarter Note',
+			duration: 0.375,
+			code: 'U+ECA5'
+		},
 		eighth: { name: 'Quaver', description: 'Eighth Note', duration: 0.125, code: 'U+ECA7' },
+		dotted_eighth: {
+			name: 'Dotted Quaver',
+			description: 'Dotted Eighth Note',
+			duration: 0.1875,
+			code: 'U+ECA7'
+		},
 		sixteenth: {
 			name: 'Semiquaver',
 			description: 'Sixteenth Note',
 			duration: 0.0625,
 			code: 'U+E1D9'
+		},
+		dotted_sixteenth: {
+			name: 'Dotted Semiquaver',
+			description: 'Dotted Sixteenth Note',
+			duration: 0.09375,
+			code: 'U+E1D9'
 		}
 	}
 };
 
+export const AUGMENTATION = 'U+E1E7';
+
 export const REST = {
 	double: { name: 'Breave', description: 'Double Rest', duration: 2, code: 'U+E4E2' },
+	dotted_double: {
+		name: 'Dotted Breave',
+		description: 'Dotted Double Rest',
+		duration: 3,
+		code: 'U+E4E2'
+	},
 	whole: { name: 'Semibreve', description: 'Whole Rest', duration: 1, code: 'U+E4E3' },
+	dotted_whole: {
+		name: 'Dotted Semibreve',
+		description: 'Dotted Whole Rest',
+		duration: 1.5,
+		code: 'U+E4E3'
+	},
 	half: { name: 'Minim', description: 'Half Rest', duration: 0.5, code: 'U+E4E4' },
+	dotted_half: {
+		name: 'Dotted Minim',
+		description: 'Dotted Half Rest',
+		duration: 0.75,
+		code: 'U+E4E4'
+	},
 	quarter: { name: 'Crotchet', description: 'Quarter Rest', duration: 0.25, code: 'U+E4E5' },
+	dotted_quarter: {
+		name: 'Dotted Crotchet',
+		description: 'Dotted Quarter Rest',
+		duration: 0.375,
+		code: 'U+E4E5'
+	},
 	eighth: { name: 'Quaver', description: 'Eighth Rest', duration: 0.125, code: 'U+E4E6' },
-	sixteenth: { name: 'Semiquaver', description: 'Sixteenth Rest', duration: 0.0625, code: 'U+E4E7' }
+	dotted_eighth: {
+		name: 'Dotted Quaver',
+		description: 'Dotted Eighth Rest',
+		duration: 0.1875,
+		code: 'U+E4E6'
+	},
+	sixteenth: {
+		name: 'Semiquaver',
+		description: 'Sixteenth Rest',
+		duration: 0.0625,
+		code: 'U+E4E7'
+	},
+	dotted_sixteenth: {
+		name: 'Dotted Semiquaver',
+		description: 'Dotted Sixteenth Rest',
+		duration: 0.09375,
+		code: 'U+E4E7'
+	}
 };
-
-export const DIRECTION_IDS = ['down', 'up'];
-
-export const NOTE_IDS = ['double', 'whole', 'half', 'quarter', 'eighth', 'sixteenth'];
-
 export const NOTES = {
 	// Octave 0
 	C0: -33,
-	'C#0': -33,
-	Db0: -33,
 	D0: -32,
-	'D#0': -32,
-	Eb0: -32,
+	Db0: -32, // accidental
+	'C#0': -32, // accidental
 	E0: -31,
+	Eb0: -31, // accidental
+	'E#0': -30, // accidental
 	F0: -30,
-	'F#0': -30,
-	Gb0: -30,
+	'F#0': -29, // accidental
 	G0: -29,
-	'G#0': -29,
-	Ab0: -29,
+	Gb0: -29, // accidental
+	'G#0': -28, // accidental
 	A0: -28,
-	'A#0': -28,
-	Bb0: -28,
+	Ab0: -28, // accidental
+	'A#0': -27, // accidental
 	B0: -27,
+	Bb0: -27, // accidental
 
 	// Octave 1
 	C1: -26,
-	'C#1': -26,
-	Db1: -26,
 	D1: -25,
-	'D#1': -25,
-	Eb1: -25,
+	Db1: -25, // accidental
+	'C#1': -25, // accidental
 	E1: -24,
+	Eb1: -24, // accidental
+	'E#1': -23, // accidental
 	F1: -23,
-	'F#1': -23,
-	Gb1: -23,
+	'F#1': -22, // accidental
 	G1: -22,
-	'G#1': -22,
-	Ab1: -22,
+	Gb1: -22, // accidental
+	'G#1': -21, // accidental
 	A1: -21,
-	'A#1': -21,
-	Bb1: -21,
+	Ab1: -21, // accidental
+	'A#1': -20, // accidental
 	B1: -20,
+	Bb1: -20, // accidental
 
 	// Octave 2
 	C2: -19,
-	'C#2': -19,
-	Db2: -19,
 	D2: -18,
-	'D#2': -18,
-	Eb2: -18,
+	Db2: -18, // accidental
+	'C#2': -18, // accidental
 	E2: -17,
+	Eb2: -17, // accidental
+	'E#2': -16, // accidental
 	F2: -16,
-	'F#2': -16,
-	Gb2: -16,
+	'F#2': -15, // accidental
 	G2: -15,
-	'G#2': -15,
-	Ab2: -15,
+	Gb2: -15, // accidental
+	'G#2': -14, // accidental
 	A2: -14,
-	'A#2': -14,
-	Bb2: -14,
+	Ab2: -14, // accidental
+	'A#2': -13, // accidental
 	B2: -13,
+	Bb2: -13, // accidental
 
 	// Octave 3
 	C3: -12,
-	'C#3': -12,
-	Db3: -12,
 	D3: -11,
-	'D#3': -11,
-	Eb3: -11,
+	Db3: -11, // accidental
+	'C#3': -11, // accidental
 	E3: -10,
+	Eb3: -10, // accidental
+	'E#3': -9, // accidental
 	F3: -9,
-	'F#3': -9,
-	Gb3: -9,
+	'F#3': -8, // accidental
 	G3: -8,
-	'G#3': -8,
-	Ab3: -8,
+	Gb3: -8, // accidental
+	'G#3': -7, // accidental
 	A3: -7,
-	'A#3': -7,
-	Bb3: -7,
+	Ab3: -7, // accidental
+	'A#3': -6, // accidental
 	B3: -6,
+	Bb3: -6, // accidental
 
 	// Octave 4 (middle C)
 	C4: -5,
-	'C#4': -5,
-	Db4: -5,
 	D4: -4,
-	'D#4': -4,
-	Eb4: -4,
+	Db4: -4, // accidental
+	'C#4': -4, // accidental
 	E4: -3,
+	Eb4: -3, // accidental
+	'E#4': -2, // accidental
 	F4: -2,
-	'F#4': -2,
-	Gb4: -2,
+	'F#4': -1, // accidental
 	G4: -1,
-	'G#4': -1,
-	Ab4: -1,
+	Gb4: -1, // accidental
+	'G#4': 0, // accidental
 	A4: 0,
-	'A#4': 0,
-	Bb4: 0,
+	Ab4: 0, // accidental
+	'A#4': 1, // accidental
 	B4: 1,
+	Bb4: 1, // accidental
 
 	// Octave 5
 	C5: 2,
-	'C#5': 2,
-	Db5: 2,
 	D5: 3,
-	'D#5': 3,
-	Eb5: 3,
+	Db5: 3, // accidental
+	'C#5': 3, // accidental
 	E5: 4,
+	Eb5: 4, // accidental
+	'E#5': 5, // accidental
 	F5: 5,
-	'F#5': 5,
-	Gb5: 5,
+	'F#5': 6, // accidental
 	G5: 6,
-	'G#5': 6,
-	Ab5: 6,
+	Gb5: 6, // accidental
+	'G#5': 7, // accidental
 	A5: 7,
-	'A#5': 7,
-	Bb5: 7,
+	Ab5: 7, // accidental
+	'A#5': 8, // accidental
 	B5: 8,
+	Bb5: 8, // accidental
 
 	// Octave 6
 	C6: 9,
-	'C#6': 9,
-	Db6: 9,
 	D6: 10,
-	'D#6': 10,
-	Eb6: 10,
+	Db6: 10, // accidental
+	'C#6': 10, // accidental
 	E6: 11,
+	Eb6: 11, // accidental
+	'E#6': 12, // accidental
 	F6: 12,
-	'F#6': 12,
-	Gb6: 12,
+	'F#6': 13, // accidental
 	G6: 13,
-	'G#6': 13,
-	Ab6: 13,
+	Gb6: 13, // accidental
+	'G#6': 14, // accidental
 	A6: 14,
-	'A#6': 14,
-	Bb6: 14,
+	Ab6: 14, // accidental
+	'A#6': 15, // accidental
 	B6: 15,
+	Bb6: 15, // accidental
 
 	// Octave 7
 	C7: 16,
-	'C#7': 16,
-	Db7: 16,
 	D7: 17,
-	'D#7': 17,
-	Eb7: 17,
+	Db7: 17, // accidental
+	'C#7': 17, // accidental
 	E7: 18,
+	Eb7: 18, // accidental
+	'E#7': 19, // accidental
 	F7: 19,
-	'F#7': 19,
-	Gb7: 19,
+	'F#7': 20, // accidental
 	G7: 20,
-	'G#7': 20,
-	Ab7: 20,
+	Gb7: 20, // accidental
+	'G#7': 21, // accidental
 	A7: 21,
-	'A#7': 21,
-	Bb7: 21,
+	Ab7: 21, // accidental
+	'A#7': 22, // accidental
 	B7: 22,
+	Bb7: 22, // accidental
 
 	// Octave 8
 	C8: 23,
-	'C#8': 23,
-	Db8: 23,
 	D8: 24,
-	'D#8': 24,
-	Eb8: 24,
+	Db8: 24, // accidental
+	'C#8': 24, // accidental
 	E8: 25,
+	Eb8: 25, // accidental
+	'E#8': 26, // accidental
 	F8: 26,
-	'F#8': 26,
-	Gb8: 26,
+	'F#8': 27, // accidental
 	G8: 27,
-	'G#8': 27,
-	Ab8: 27,
+	Gb8: 27, // accidental
+	'G#8': 28, // accidental
 	A8: 28,
-	'A#8': 28,
-	Bb8: 28,
+	Ab8: 28, // accidental
+	'A#8': 29, // accidental
 	B8: 29,
+	Bb8: 29, // accidental
 
 	// Octave 9
 	C9: 30,
-	'C#9': 30,
-	Db9: 30,
 	D9: 31,
-	'D#9': 31,
-	Eb9: 31,
+	Db9: 31, // accidental
+	'C#9': 31, // accidental
 	E9: 32,
+	Eb9: 32, // accidental
+	'E#9': 33, // accidental
 	F9: 33,
-	'F#9': 33,
-	Gb9: 33,
+	'F#9': 34, // accidental
 	G9: 34,
-	'G#9': 34,
-	Ab9: 34,
+	Gb9: 34, // accidental
+	'G#9': 35, // accidental
 	A9: 35,
-	'A#9': 35,
-	Bb9: 35,
+	Ab9: 35, // accidental
+	'A#9': 36, // accidental
 	B9: 36,
+	Bb9: 36, // accidental
 
 	// Octave 10
 	C10: 37,
-	'C#10': 37,
-	Db10: 37,
 	D10: 38,
-	'D#10': 38,
-	Eb10: 38,
+	Db10: 38, // accidental
+	'C#10': 38, // accidental
 	E10: 39,
+	Eb10: 39, // accidental
+	'E#10': 40, // accidental
 	F10: 40,
-	'F#10': 40,
-	Gb10: 40,
+	'F#10': 41, // accidental
 	G10: 41,
-	'G#10': 41,
-	Ab10: 41,
+	Gb10: 41, // accidental
+	'G#10': 42, // accidental
 	A10: 42,
-	'A#10': 42,
-	Bb10: 42,
-	B10: 43
+	Ab10: 42, // accidental
+	'A#10': 43, // accidental
+	B10: 43,
+	Bb10: 43.01
 };
 
 // Staff positions for sharps and flats in treble clef

@@ -10,7 +10,8 @@
 		NOTE,
 		DIRECTION_IDS,
 		REST,
-		ACCIDENTAL
+		ACCIDENTAL,
+		ACCIDENTAL_IDS
 	} from './config';
 
 	let {
@@ -28,7 +29,8 @@
 		cursorPosition = $bindable(),
 		playbackPercentage = $bindable(),
 		playbackMin = $bindable(),
-		playbackMax = $bindable()
+		playbackMax = $bindable(),
+		accidental = $bindable()
 	} = $props();
 </script>
 
@@ -193,6 +195,8 @@
 					16
 				)
 			)}
+
+			{@html String.fromCodePoint(parseInt(ACCIDENTAL[accidental].replace('U+', ''), 16))}
 		</span>
 	</p>
 
@@ -229,6 +233,19 @@
 				Rest
 			</label>
 		</div>
+	</div>
+	<div class="input-group">
+		<label class="label" for="accidentalSelect">Accidental </label>
+		<select
+			class="input"
+			id="accidentalSelect"
+			bind:value={accidental}
+			aria-label="Select accidental"
+		>
+			{#each ACCIDENTAL_IDS as id}
+				<option value={id}>{id}</option>
+			{/each}
+		</select>
 	</div>
 </div>
 

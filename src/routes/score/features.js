@@ -1,3 +1,5 @@
+import { AUGMENTATION } from './config';
+
 // Helper function to calculate vertical position on staff
 export function calculateStaffPosition(position, radius) {
 	// Base position is the middle line (B4)
@@ -9,16 +11,24 @@ export function calculateStaffPosition(position, radius) {
 // Get position of a note on the staff
 export function getNotePosition(note, NOTES, currentClef) {
 	// Get the base position from NOTES
+
 	const basePosition = NOTES[note] || 0;
-	
+
 	// Apply the clef offset if provided
 	if (currentClef && currentClef.offset !== undefined) {
 		// Adjust the position based on the clef's offset
 		return basePosition + currentClef.offset;
 	}
-	
+
 	return basePosition;
 }
+
+export const findAccidental = (note) => {
+	const accidental = note.replace(/[^#b]/g, '');
+	if (accidental === '#') return 'sharp';
+	if (accidental === 'b') return 'flat';
+	return 'natural';
+};
 
 // Create createFeatures factory for drawing elements
 export const createFeatures = (
@@ -55,8 +65,7 @@ export const createFeatures = (
 		if (barsInSystem === 1) {
 			staffEndX = startPadding + firstBarWidth + endPadding;
 		} else if (barsInSystem > 1) {
-			staffEndX =
-				startPadding + firstBarWidth + (barsInSystem - 1) * regularBarWidth + endPadding;
+			staffEndX = startPadding + firstBarWidth + (barsInSystem - 1) * regularBarWidth + endPadding;
 		}
 
 		group
@@ -139,9 +148,7 @@ export const createFeatures = (
 				.attr('class', 'smuFL-symbol')
 				.style('font-size', `${scaledFontSize}px`)
 				.text(
-					String.fromCodePoint(
-						parseInt(currentTimeSignature.denominatorCode.replace('U+', ''), 16)
-					)
+					String.fromCodePoint(parseInt(currentTimeSignature.denominatorCode.replace('U+', ''), 16))
 				);
 		}
 	},
@@ -198,6 +205,11 @@ export const createFeatures = (
 	note: (system, barIndex, noteData) => {
 		const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
 
+		const accidental = findAccidental(noteData.note);
+		const hasAccidental = accidental !== 'natural';
+		const accidentalNotInKey = hasAccidental && !currentKeySignature[accidental];
+		const accidentalCode = hasAccidental && accidentalNotInKey ? ACCIDENTAL[accidental] : null;
+
 		// Calculate x position based on bar position
 		let barStartX = startPadding;
 		if (barIndex > 0) {
@@ -210,13 +222,14 @@ export const createFeatures = (
 		// Position within the bar based on startTime/position
 		// Calculate the x position directly based on the bar start and the note's position within the bar
 		const standardBarPadding = radius; // Standard padding from bar lines
-		
+
 		// Add extra padding for first bar of each system (where key/time signatures are)
 		const isFirstBar = barIndex === 0;
 		const extraPadding = isFirstBar ? radius * 8 : 0; // Increased padding from 4 to 8 for bars with key/time signatures
 		const barPadding = standardBarPadding + extraPadding;
-		
-		const usableBarWidth = barWidth - (isFirstBar ? barPadding + standardBarPadding : standardBarPadding * 2); // Width available for notes
+
+		const usableBarWidth =
+			barWidth - (isFirstBar ? barPadding + standardBarPadding : standardBarPadding * 2); // Width available for notes
 
 		// Ensure position is used directly from noteData, with a fallback to 0.5
 		// This ensures notes are placed exactly where specified
@@ -226,10 +239,12 @@ export const createFeatures = (
 		const xPos = barStartX + barPadding + position * usableBarWidth + radius * 0.5;
 
 		// Calculate vertical position based on the note
-		const yPos = yStart + calculateStaffPosition(getNotePosition(noteData.note, NOTES, currentClef), radius);
+		const yPos =
+			yStart + calculateStaffPosition(getNotePosition(noteData.note, NOTES, currentClef), radius);
 
 		// Create a group for the note to make it easier to add additional elements
-		const noteGroup = group.append('g')
+		const noteGroup = group
+			.append('g')
 			.attr('class', 'note')
 			.attr('transform', `translate(${xPos}, ${yPos})`)
 			.attr('data-bar-index', barIndex)
@@ -251,12 +266,33 @@ export const createFeatures = (
 		}
 
 		// Add the note symbol
-		noteGroup.append('text')
+		noteGroup
+			.append('text')
 			.attr('class', 'smuFL-symbol')
 			.attr('text-anchor', 'middle')
 			.style('font-size', `${scaledFontSize}px`)
 			.text(noteSymbol);
 
-	
-	},
+		// Add accidental if needed
+		if (accidentalCode) {
+			noteGroup
+				.append('text')
+				.attr('class', 'smuFL-symbol accidental')
+				.attr('x', radius * (noteData.duration.includes('dotted') ? 2.1 : 1.2)) // Position to the left of the note
+				.attr('text-anchor', 'middle')
+				.style('font-size', `${scaledFontSize}px`)
+				.text(String.fromCodePoint(parseInt(accidentalCode.replace('U+', ''), 16)));
+		}
+
+		// Add augmentation if needed
+		if (noteData.duration.includes('dotted')) {
+			noteGroup
+				.append('text')
+				.attr('class', 'smuFL-symbol augmentation')
+				.attr('x', radius * 1.2) // Position to the left of the note
+				.attr('text-anchor', 'middle')
+				.style('font-size', `${scaledFontSize}px`)
+				.text(String.fromCodePoint(parseInt(AUGMENTATION.replace('U+', ''), 16)));
+		}
+	}
 });
