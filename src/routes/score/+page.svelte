@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import * as d3 from 'd3';
 	import { browser } from '$app/environment';
+	import * as Tone from 'tone';
 	import {
 		CLEF,
 		KEY_SIGNATURE,
@@ -15,7 +16,8 @@
 		FLAT_POSITIONS,
 		ACCIDENTAL
 	} from './config';
-	// import { createFeatures, calculateStaffPosition, getNotePosition } from './features';
+	import { createFeatures, calculateStaffPosition, getNotePosition } from './features';
+	import example_piece from './examples/4.json';
 
 	let keySignature = 'c_major_a_minor';
 	let timeSignature = '4_4_common_time';
@@ -23,7 +25,7 @@
 	let note = 'quarter';
 	let direction = 'down';
 	let rest = false;
-	let barCount = 12;
+	let barCount = 50;
 	let radius = 10;
 	let scoreNotes = [];
 	let bpm = 120;
@@ -36,8 +38,14 @@
 	let container;
 	let svg = null;
 	let ghostNote = null;
+	let playCursor = null;
 
 	let SVG_WIDTH = 400;
+
+	// Tone.js related variables
+	let synth;
+	let currentNoteIndex = 0;
+	let playbackInterval;
 
 	const ghostNoteState = {
 		note: 'C4',
@@ -85,6 +93,42 @@
 	$: firstBarWidth = firstBarExtraWidth + (barsPerSystem > 1 ? regularBarWidth : availableWidth);
 	$: staffHeight = (config.staffLines - 1) * radius;
 	$: TOTAL_HEIGHT = verticalPadding * 2 + systemCount * (staffHeight + config.systemMarginTop);
+	$: playbackPercentage = 0;
+	$: playbackMin = 0;
+	$: playbackMax = scoreNotes.length - 1;
+
+	$: currentNote = scoreNotes[cursorPosition];
+
+	$: console.log(currentNote);
+	$: if (playing !== undefined) {
+		if (playing) {
+			startPlayback();
+		} else {
+			stopPlayback();
+		}
+	}
+
+	$: if (typeof bpm === 'number' && synth) {
+		Tone.Transport.bpm.value = bpm;
+	}
+
+	if (bpm !== undefined && synth) {
+		Tone.Transport.bpm.value = bpm;
+	}
+
+	$: if (svg && (barCount || SVG_WIDTH || keySignature || timeSignature || radius)) {
+		renderStaff(svg, createRenderContext());
+	}
+
+	$: if (playCursor && svg) {
+		updatePlayCursor();
+	}
+
+	$: if (playCursor && (cursorPosition !== undefined || playing !== undefined)) {
+		updatePlayCursor();
+	}
+
+	$: console.log(scoreNotes);
 
 	onMount(() => {
 		if (!browser) return;
@@ -92,297 +136,92 @@
 		svg = createSvgContainer('#staff-container', SVG_WIDTH, TOTAL_HEIGHT);
 
 		ghostNote = createGhostNoteGroup(svg);
+		playCursor = createPlayCursor(svg);
 
 		handleResize();
 		window.addEventListener('resize', handleResize);
 
 		scoreNotes = [];
 
-		const exampleNotes = [
-			{ noteIndex: 0, note: 'A4', duration: 'half' },
-			{ noteIndex: 1, note: 'B4', duration: 'quarter' },
-			{ noteIndex: 2, note: 'C4', duration: 'eighth' },
-			{ noteIndex: 3, note: 'D4', duration: 'sixteenth' },
-			{ noteIndex: 4, note: 'E4', duration: 'sixteenth' }
-		];
+		// const exampleNotes = [
+		// 	{ noteIndex: 0, note: 'A4', duration: 'half' },
+		// 	{ noteIndex: 1, note: 'B4', duration: 'quarter' },
+		// 	{ noteIndex: 2, note: 'C4', duration: 'eighth' },
+		// 	{ noteIndex: , note: 'D4', duration: 'sixteenth' },
+		// 	{ noteIndex: 4, note: 'E4', duration: 'sixteenth' }
+		// ];
+
+		// const exampleNotes = [
+		// { noteIndex: 0, note: 'A4', duration: 'eighth' }
+		// { noteIndex: 1, note: 'B4', duration: 'eighth' },
+		// { noteIndex: 2, note: 'C4', duration: 'eighth' },
+		// { noteIndex: 3, note: 'D4', duration: 'eighth' },
+		// { noteIndex: 4, note: 'E4', duration: 'eighth' },
+		// { noteIndex: 5, note: 'F4', duration: 'eighth' },
+		// { noteIndex: 6, note: 'G4', duration: 'eighth' },
+		// { noteIndex: 7, note: 'A5', duration: 'eighth' },
+		// { noteIndex: 8, note: 'B5', duration: 'eighth' },
+		// { noteIndex: 9, note: 'C5', duration: 'eighth' },
+		// { noteIndex: 10, note: 'D5', duration: 'eighth' },
+		// { noteIndex: 11, note: 'E5', duration: 'eighth' },
+		// { noteIndex: 12, note: 'F5', duration: 'eighth' },
+		// { noteIndex: 13, note: 'G5', duration: 'eighth' }
+		// ];
+
+		// const exampleNotes = [{ noteIndex: 0, note: 'C4', duration: 'eighth' }];
+		// const exampleNotes = [
+		// 	{ noteIndex: 0, note: 'C4', duration: 'eighth' },
+		// 	{ noteIndex: 1, note: 'D4', duration: 'eighth' },
+		// 	{ noteIndex: 2, note: 'E4', duration: 'eighth' },
+		// 	{ noteIndex: 3, note: 'F4', duration: 'eighth' },
+		// 	{ noteIndex: 4, note: 'G4', duration: 'eighth' },
+		// 	{ noteIndex: 5, note: 'A4', duration: 'eighth' },
+		// 	{ noteIndex: 7, note: 'B4', duration: 'eighth' },
+		// ];
+
+		// const exampleOctaves = 10;
+		// const notesInAnOctave = 7;
+		// const letters = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+
+		// const exampleNotes = Array.from(
+		// 	{ length: exampleOctaves * notesInAnOctave + Math.floor(exampleOctaves) },
+		// 	(_, i) => {
+		// 		// Check if this is a rest (inserted after each octave)
+		// 		const isRest = i > 0 && i % (notesInAnOctave + 1) === notesInAnOctave;
+
+		// 		// For rests, we still need a valid note name but will mark it as rest
+		// 		const adjustedIndex = i - Math.floor(i / (notesInAnOctave + 1));
+		// 		const octave = Math.floor(adjustedIndex / notesInAnOctave) + 0;
+		// 		const letter = letters[adjustedIndex % notesInAnOctave];
+
+		// 		return {
+		// 			noteIndex: i,
+		// 			note: `${letter}${octave}`,
+		// 			duration: 'eighth',
+		// 			rest: isRest
+		// 		};
+		// 	}
+		// );
+
+		const exampleNotes = example_piece;
 
 		scoreNotes = addMultipleNotes(exampleNotes, scoreNotes);
 		renderStaff(svg, createRenderContext());
 
 		const cleanupListeners = setupEventListeners('#staff-container');
 
+		// Initialize Tone.js synth
+		initializeTone();
+
 		return () => {
 			window.removeEventListener('resize', handleResize);
 			cleanupListeners();
+
+			// Clean up Tone.js resources
+			stopPlayback();
+			if (synth) synth.dispose();
 		};
 	});
-
-	// Helper function to calculate vertical position on staff
-	export function calculateStaffPosition(position, radius) {
-		// Base position is the middle line (B4)
-		const base = radius * 2;
-		// Each position is half a radius up or down
-		return base - (position * radius) / 2;
-	}
-
-	// Get position of a note on the staff
-	export function getNotePosition(note, NOTES, currentClef) {
-		// Get the base position from NOTES
-		const basePosition = NOTES[note] || 0;
-
-		// Apply the clef offset if provided
-		if (currentClef && currentClef.offset !== undefined) {
-			// Adjust the position based on the clef's offset
-			return basePosition + currentClef.offset;
-		}
-
-		return basePosition;
-	}
-
-	// Create createFeatures factory for drawing elements
-	export const createFeatures = (
-		group,
-		{
-			radius,
-			verticalPadding,
-			staffHeight,
-			config,
-			startPadding,
-			firstBarWidth,
-			regularBarWidth,
-			endPadding,
-			currentClef,
-			currentKeySignature,
-			currentTimeSignature,
-			scaledFontSize,
-			SVG_WIDTH,
-			SHARP_POSITIONS,
-			FLAT_POSITIONS,
-			NOTE,
-			REST_CONFIG,
-			ACCIDENTAL,
-			NOTES
-		}
-	) => ({
-		staffLine: (systemIndex, lineIndex, barsInSystem) => {
-			const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
-			const yPosition = yStart + lineIndex * radius;
-
-			// Calculate the exact end position for staff lines
-			// This ensures the staff lines extend far enough for all bars
-			let staffEndX = startPadding;
-			if (barsInSystem === 1) {
-				staffEndX = startPadding + firstBarWidth + endPadding;
-			} else if (barsInSystem > 1) {
-				staffEndX =
-					startPadding + firstBarWidth + (barsInSystem - 1) * regularBarWidth + endPadding;
-			}
-
-			group
-				.append('line')
-				.attr('class', 'staff-line')
-				.attr('x1', startPadding)
-				.attr('x2', staffEndX)
-				.attr('y1', yPosition)
-				.attr('y2', yPosition)
-				.attr('stroke', config.staffLineColor)
-				.attr('stroke-width', config.staffLineWidth);
-		},
-		barLine: (system, barIndex, isSystemBoundary = false) => {
-			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-			let xPos = startPadding;
-
-			if (barIndex === 1) {
-				xPos += firstBarWidth;
-			} else if (barIndex > 1) {
-				xPos += firstBarWidth + (barIndex - 1) * regularBarWidth;
-			}
-
-			// Ensure position doesn't exceed width
-			xPos = Math.min(xPos, SVG_WIDTH - endPadding);
-
-			group
-				.append('line')
-				.attr('class', 'bar-line')
-				.attr('x1', xPos)
-				.attr('x2', xPos)
-				.attr('y1', yStart)
-				.attr('y2', yStart + staffHeight)
-				.attr('stroke', 'black')
-				.attr('stroke-width', isSystemBoundary ? 2 : 1.5);
-		},
-		clef: (system) => {
-			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-			const yPosition = yStart + calculateStaffPosition(currentClef.yPosition, radius);
-
-			group
-				.append('text')
-				.attr('class', 'clef')
-				.attr('x', startPadding + radius * 2)
-				.attr('y', yPosition)
-				.attr('text-anchor', 'middle')
-				.attr('class', 'smuFL-symbol')
-				.style('font-size', `${scaledFontSize}px`)
-				.text(String.fromCodePoint(parseInt(currentClef.code.replace('U+', ''), 16)));
-		},
-		timeSignature: (system) => {
-			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-			// Position time signature after key signature
-			const baseXPos = startPadding + radius * 5; // Base position after clef
-			// Add space for key signature accidentals
-			const keySigWidth = Math.max(currentKeySignature.sharps, currentKeySignature.flats) * radius;
-			const xPosition = baseXPos + keySigWidth + (keySigWidth > 0 ? radius : 0);
-
-			if (system === 0) {
-				// Always use numeric representation for consistency
-				// Draw numerator
-				group
-					.append('text')
-					.attr('class', 'time-signature-numerator')
-					.attr('x', xPosition)
-					.attr('y', yStart + radius * 0.5)
-					.attr('text-anchor', 'middle')
-					.attr('class', 'smuFL-symbol')
-					.style('font-size', `${scaledFontSize}px`)
-					.text(
-						String.fromCodePoint(parseInt(currentTimeSignature.numeratorCode.replace('U+', ''), 16))
-					);
-
-				// Draw denominator
-				group
-					.append('text')
-					.attr('class', 'time-signature-denominator')
-					.attr('x', xPosition)
-					.attr('y', yStart + radius * 2.5)
-					.attr('text-anchor', 'middle')
-					.attr('class', 'smuFL-symbol')
-					.style('font-size', `${scaledFontSize}px`)
-					.text(
-						String.fromCodePoint(
-							parseInt(currentTimeSignature.denominatorCode.replace('U+', ''), 16)
-						)
-					);
-			}
-		},
-		keySignature: (system) => {
-			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-			const baseXPos = startPadding + radius * 5; // Reduced from 7 to bring closer to clef
-
-			// Adjust sharp and flat positions based on the current clef
-			const adjustPositionForClef = (position) => {
-				// Apply the clef offset to adjust the position
-				if (currentClef && currentClef.offset !== undefined) {
-					return position + currentClef.offset;
-				}
-				return position;
-			};
-
-			// Draw sharps or flats based on key signature
-			if (currentKeySignature.sharps > 0) {
-				for (let i = 0; i < currentKeySignature.sharps; i++) {
-					// Adjust the position based on the current clef
-					const position = adjustPositionForClef(SHARP_POSITIONS[i]);
-					const yPos = yStart + calculateStaffPosition(position, radius);
-					const xPos = baseXPos + i * radius;
-
-					group
-						.append('text')
-						.attr('class', 'key-signature')
-						.attr('x', xPos)
-						.attr('y', yPos)
-						.attr('text-anchor', 'middle')
-						.attr('class', 'smuFL-symbol')
-						.style('font-size', `${scaledFontSize}px`)
-						.text(String.fromCodePoint(parseInt(ACCIDENTAL.sharp.replace('U+', ''), 16))); // Sharp symbol
-				}
-			} else if (currentKeySignature.flats > 0) {
-				for (let i = 0; i < currentKeySignature.flats; i++) {
-					// Adjust the position based on the current clef
-					const position = adjustPositionForClef(FLAT_POSITIONS[i]);
-					const yPos = yStart + calculateStaffPosition(position, radius);
-					const xPos = baseXPos + i * radius;
-
-					group
-						.append('text')
-						.attr('class', 'key-signature')
-						.attr('x', xPos)
-						.attr('y', yPos)
-						.attr('text-anchor', 'middle')
-						.attr('class', 'smuFL-symbol')
-						.style('font-size', `${scaledFontSize}px`)
-						.text(String.fromCodePoint(parseInt(ACCIDENTAL.flat.replace('U+', ''), 16))); // Flat symbol
-				}
-			}
-		},
-		note: (system, barIndex, noteData) => {
-			const yStart = verticalPadding + system * (staffHeight + config.systemMarginTop);
-
-			// Calculate x position based on bar position
-			let barStartX = startPadding;
-			if (barIndex > 0) {
-				barStartX += firstBarWidth + (barIndex - 1) * regularBarWidth;
-			}
-
-			// Get the width of the current bar
-			const barWidth = barIndex === 0 ? firstBarWidth : regularBarWidth;
-
-			// Position within the bar based on startTime/position
-			// Calculate the x position directly based on the bar start and the note's position within the bar
-			const standardBarPadding = radius; // Standard padding from bar lines
-
-			// Add extra padding for first bar of each system (where key/time signatures are)
-			const isFirstBar = barIndex === 0;
-			const extraPadding = isFirstBar ? radius * 8 : 0; // Increased padding from 4 to 8 for bars with key/time signatures
-			const barPadding = standardBarPadding + extraPadding;
-
-			const usableBarWidth =
-				barWidth - (isFirstBar ? barPadding + standardBarPadding : standardBarPadding * 2); // Width available for notes
-
-			// Ensure position is used directly from noteData, with a fallback to 0.5
-			// This ensures notes are placed exactly where specified
-			const position = typeof noteData.position === 'number' ? noteData.position : 0.5;
-
-			// Calculate the x position with padding
-			const xPos = barStartX + barPadding + position * usableBarWidth + radius * 0.5;
-
-			// Calculate vertical position based on the note
-			const yPos =
-				yStart + calculateStaffPosition(getNotePosition(noteData.note, NOTES, currentClef), radius);
-
-			// Create a group for the note to make it easier to add additional elements
-			const noteGroup = group
-				.append('g')
-				.attr('class', 'note')
-				.attr('transform', `translate(${xPos}, ${yPos})`)
-				.attr('data-bar-index', barIndex)
-				.attr('data-position', position);
-
-			// Add noteIndex as a data attribute if it exists
-			if (noteData.noteIndex !== undefined) {
-				noteGroup.attr('data-note-index', noteData.noteIndex);
-			}
-
-			let noteSymbol;
-			if (noteData.rest) {
-				const restCode = REST_CONFIG[noteData.duration]?.code || '';
-				noteSymbol = String.fromCodePoint(parseInt(restCode.replace('U+', ''), 16));
-			} else {
-				const noteDirection = noteData.direction || 'down';
-				const noteCode = NOTE[noteDirection]?.[noteData.duration]?.code || '';
-				noteSymbol = String.fromCodePoint(parseInt(noteCode.replace('U+', ''), 16));
-			}
-
-			// Add the note symbol
-			noteGroup
-				.append('text')
-				.attr('class', 'smuFL-symbol')
-				.attr('text-anchor', 'middle')
-				.style('font-size', `${scaledFontSize}px`)
-				.text(noteSymbol);
-		}
-	});
-
-	$: console.log(scoreNotes);
 
 	function createSvgContainer(selector, width, height) {
 		return d3.select(selector).append('svg').attr('width', width).attr('height', height);
@@ -394,6 +233,18 @@
 			.attr('class', 'ghost-note')
 			.style('opacity', 0)
 			.style('pointer-events', 'none');
+	}
+
+	function createPlayCursor(svg) {
+		return svg
+			.append('line')
+			.attr('class', 'play-cursor')
+			.attr('stroke', '#ff5722')
+			.attr('stroke-width', 2)
+			.attr('stroke-dasharray', '5,3')
+			.attr('y1', 0)
+			.attr('y2', 0) // Will be set dynamically
+			.attr('visibility', 'hidden');
 	}
 
 	function setupEventListeners(selector) {
@@ -485,7 +336,6 @@
 		const context = createRenderContext();
 		const mousePosition = getMousePosition(event, svg.node());
 
-		// Only add a note if the ghost note is visible (i.e., cursor is in a valid position)
 		if (ghostNoteState.visible) {
 			const newNote = {
 				noteIndex: ghostNoteState.noteIndex,
@@ -772,10 +622,6 @@
 		};
 	}
 
-	$: if (svg && (barCount || SVG_WIDTH || keySignature || timeSignature || radius)) {
-		renderStaff(svg, createRenderContext());
-	}
-
 	function updateGhostNote(ghostNote, ghostNoteState, context) {
 		if (!ghostNote) return;
 
@@ -824,6 +670,95 @@
 			.style('font-size', `${context.scaledFontSize}px`)
 			.style('fill', '#666')
 			.text(getNoteSymbol({ note, duration, direction, rest }, { REST_CONFIG, NOTE }));
+	}
+
+	function updatePlayCursor() {
+		if (!playCursor || !svg) return;
+
+		if (!scoreNotes.length) {
+			playCursor.attr('visibility', 'hidden');
+			return;
+		}
+
+		// Get all unique note indices
+		const uniqueNoteIndices = [...new Set(scoreNotes.map((note) => note.noteIndex || 0))].sort(
+			(a, b) => a - b
+		);
+
+		// Determine if we're at a valid position (including after playback ends)
+		const isValidPosition = cursorPosition <= Math.max(...uniqueNoteIndices);
+
+		if (!isValidPosition) {
+			playCursor.attr('visibility', 'hidden');
+			return;
+		}
+
+		// Find notes at current position (including rests)
+		const currentNotes = scoreNotes.filter((note) => note.noteIndex === cursorPosition);
+
+		// If no notes at this exact position, find the closest previous note
+		let noteToUse;
+		if (currentNotes.length > 0) {
+			noteToUse = currentNotes[0];
+		} else {
+			// Find the nearest previous note
+			const previousIndices = uniqueNoteIndices.filter((idx) => idx < cursorPosition);
+			if (previousIndices.length > 0) {
+				const nearestPrevIndex = Math.max(...previousIndices);
+				const previousNotes = scoreNotes.filter((note) => note.noteIndex === nearestPrevIndex);
+				if (previousNotes.length > 0) {
+					noteToUse = previousNotes[0];
+				}
+			}
+		}
+
+		// If we still don't have a note, hide cursor
+		if (!noteToUse) {
+			playCursor.attr('visibility', 'hidden');
+			return;
+		}
+
+		// Get position information for the note (works for both regular notes and rests)
+		const context = createRenderContext();
+		const note = noteToUse;
+
+		// Calculate the note's position
+		let xPos, systemIndex;
+
+		if (note.barIndex !== undefined) {
+			const barInfo = calculateNotePosition(note.barIndex, note.position || 0, context);
+			xPos = barInfo.xPos;
+			systemIndex = barInfo.systemIndex;
+		} else {
+			const positionInfo = calculateBarFromNoteIndex(
+				note.noteIndex,
+				scoreNotes,
+				context.currentTimeSignature
+			);
+
+			const calculatedPosition = calculateNotePosition(
+				positionInfo.barIndex,
+				positionInfo.positionInBar,
+				context
+			);
+
+			xPos = calculatedPosition.xPos;
+			systemIndex = calculatedPosition.systemIndex;
+		}
+
+		// Set the height of the cursor to cover the entire staff for that system
+		const yStart =
+			context.verticalPadding +
+			systemIndex * (context.staffHeight + context.config.systemMarginTop);
+		const yEnd = yStart + context.staffHeight;
+
+		// Update the cursor position and make it visible
+		playCursor
+			.attr('x1', xPos)
+			.attr('x2', xPos)
+			.attr('y1', yStart - context.radius)
+			.attr('y2', yEnd + context.radius)
+			.attr('visibility', 'visible');
 	}
 
 	function renderStaff(svg, context) {
@@ -942,7 +877,6 @@
 		} = context;
 
 		const systemIndex = Math.floor(barIndex / barsPerSystem);
-
 		const systemRelativeBarIndex = barIndex - systemIndex * barsPerSystem;
 
 		let barStartX = startPadding;
@@ -951,12 +885,9 @@
 		}
 
 		const barWidth = systemRelativeBarIndex === 0 ? firstBarWidth : regularBarWidth;
-
 		const barPadding = radius * 0.5;
 		const usableBarWidth = barWidth - barPadding * 2;
-
 		const xPos = barStartX + barPadding + position * usableBarWidth;
-
 		const yStart = verticalPadding + systemIndex * (staffHeight + config.systemMarginTop);
 
 		return { xPos, yStart, systemIndex, systemRelativeBarIndex };
@@ -1010,15 +941,230 @@
 			}
 
 			const match = noteBarIndex === barIndex && Math.abs(note.position - position) < 0.1;
-			if (match) {
-				console.log(
-					`Found matching note at index ${note.noteIndex}, position=${note.position.toFixed(3)}`
-				);
-			}
+
 			return match;
 		});
 
 		return matchingNotes.length > 0 ? matchingNotes[0] : undefined;
+	}
+
+	// Add helper function to adjust note based on key signature
+	function adjustNoteForKeySignature(noteName, keySignature) {
+		if (!noteName || !keySignature) return noteName;
+
+		// If no sharps or flats in the key signature, return the note as is
+		if (keySignature.sharps === 0 && keySignature.flats === 0) {
+			return noteName;
+		}
+
+		// Extract the note letter and octave
+		const noteRegex = /^([A-G])([#b]?)(\d+)$/;
+		const match = noteName.match(noteRegex);
+
+		if (!match) return noteName; // Return original if format is unexpected
+
+		const [_, letter, accidental, octave] = match;
+
+		// Standard order of sharps: F, C, G, D, A, E, B
+		const sharpOrder = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
+		// Standard order of flats: B, E, A, D, G, C, F (reverse of sharps)
+		const flatOrder = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
+
+		let adjustedNote = noteName;
+
+		// Apply sharps from key signature
+		if (keySignature.sharps > 0) {
+			// If note is in the sharps list for this key signature and doesn't already have an accidental
+			if (sharpOrder.indexOf(letter) < keySignature.sharps && accidental === '') {
+				adjustedNote = `${letter}#${octave}`;
+			}
+		}
+
+		// Apply flats from key signature
+		if (keySignature.flats > 0) {
+			// If note is in the flats list for this key signature and doesn't already have an accidental
+			if (flatOrder.indexOf(letter) < keySignature.flats && accidental === '') {
+				adjustedNote = `${letter}b${octave}`;
+			}
+		}
+
+		return adjustedNote;
+	}
+
+	// Initialize Tone.js
+	function initializeTone() {
+		if (!browser) return;
+
+		// Initialize the synth
+		synth = new Tone.PolySynth(Tone.Synth).toDestination();
+
+		// Set the BPM
+		Tone.Transport.bpm.value = bpm;
+	}
+
+	// Convert note duration to seconds
+	function getDurationInSeconds(noteDuration) {
+		const durationMap = {
+			double: 2,
+			whole: 1,
+			half: 0.5,
+			quarter: 0.25,
+			eighth: 0.125,
+			sixteenth: 0.0625
+		};
+
+		// Get the base duration in beats
+		const baseDuration = durationMap[noteDuration] || 0.25; // default to quarter note
+
+		// Convert beats to seconds based on BPM
+		return (60 / bpm) * baseDuration * 4; // 4 beats in a whole note
+	}
+
+	// Start playback
+	function startPlayback() {
+		if (!browser || !synth) return;
+
+		// Stop any existing playback
+		stopPlayback();
+
+		// Start the audio context if it's not running
+		if (Tone.context.state !== 'running') {
+			Tone.start().then(() => {
+				console.log('Audio context started');
+			});
+		}
+
+		// Make sure the scoreNotes are sorted by noteIndex
+		const sortedNotes = [...scoreNotes].sort((a, b) => {
+			return (a.noteIndex || 0) - (b.noteIndex || 0);
+		});
+
+		// Find unique noteIndices for playback
+		const uniqueNoteIndices = [...new Set(sortedNotes.map((note) => note.noteIndex || 0))].sort(
+			(a, b) => a - b
+		);
+
+		// Determine starting position based on cursor
+		let startIdx = 0;
+		if (reverse && cursorPosition > 0) {
+			// Find the last noteIndex that's less than or equal to cursor position
+			for (let i = uniqueNoteIndices.length - 1; i >= 0; i--) {
+				if (uniqueNoteIndices[i] <= cursorPosition) {
+					startIdx = i;
+					break;
+				}
+			}
+		} else if (!reverse && cursorPosition > 0) {
+			// Find the first noteIndex that's greater than or equal to cursor position
+			for (let i = 0; i < uniqueNoteIndices.length; i++) {
+				if (uniqueNoteIndices[i] >= cursorPosition) {
+					startIdx = i;
+					break;
+				}
+			}
+		}
+
+		// Set current position to the appropriate unique noteIndex
+		currentNoteIndex = uniqueNoteIndices[startIdx] || 0;
+
+		// Start playing notes
+		playNextNote();
+	}
+
+	// Stop playback
+	function stopPlayback() {
+		if (playbackInterval) {
+			clearTimeout(playbackInterval);
+			playbackInterval = null;
+		}
+	}
+
+	// Play the next note in sequence
+	function playNextNote() {
+		if (!playing || !scoreNotes.length) return;
+
+		// Find all notes with the current noteIndex (these form a chord)
+		const chordNotes = scoreNotes.filter((note) => note.noteIndex === currentNoteIndex);
+
+		if (chordNotes.length === 0) {
+			// No notes found with this index, playback should stop
+			playing = false;
+			return;
+		}
+
+		// Find all unique noteIndices in order for percentage calculation
+		const uniqueNoteIndices = [...new Set(scoreNotes.map((note) => note.noteIndex || 0))].sort(
+			(a, b) => a - b
+		);
+
+		// Find the current index in the unique noteIndices array
+		const currentUniqueIndex = uniqueNoteIndices.indexOf(currentNoteIndex);
+
+		// Calculate playback percentage
+		playbackPercentage =
+			uniqueNoteIndices.length > 1
+				? (currentUniqueIndex / (uniqueNoteIndices.length - 1)) * 100
+				: 0;
+
+		if (currentUniqueIndex === -1) {
+			// Something went wrong - stop playback
+			playing = false;
+			return;
+		}
+
+		// Skip rest notes (they're silent)
+		const nonRestNotes = chordNotes.filter((note) => !note.rest);
+		if (nonRestNotes.length > 0) {
+			// Get the longest duration from all notes in the chord
+			let maxDuration = 0;
+			for (const note of chordNotes) {
+				const noteDuration = getDurationInSeconds(note.duration);
+				maxDuration = Math.max(maxDuration, noteDuration);
+			}
+
+			// Extract note names and adjust them for key signature
+			const noteNames = nonRestNotes.map((note) =>
+				adjustNoteForKeySignature(note.note, currentKeySignature)
+			);
+
+			// Play the chord using Tone.js
+			if (synth && noteNames.length > 0) {
+				if (noteNames.length === 1) {
+					// Single note
+					synth.triggerAttackRelease(noteNames[0], maxDuration);
+				} else {
+					// Chord (multiple notes)
+					synth.triggerAttackRelease(noteNames, maxDuration);
+				}
+			}
+
+			// Update cursor position for visualization
+			cursorPosition = currentNoteIndex;
+		}
+
+		// Find the next unique noteIndex based on direction
+		const nextUniqueIndex = reverse ? currentUniqueIndex - 1 : currentUniqueIndex + 1;
+
+		// Check if we've reached the end of the sequence
+		if (nextUniqueIndex < 0 || nextUniqueIndex >= uniqueNoteIndices.length) {
+			// End of playback
+			playing = false;
+			return;
+		}
+
+		// Get the longest duration from all the notes in the chord
+		let maxDuration = 0;
+		for (const note of chordNotes) {
+			const noteDuration = getDurationInSeconds(note.duration);
+			maxDuration = Math.max(maxDuration, noteDuration);
+		}
+
+		// Schedule the next chord
+		playbackInterval = setTimeout(() => {
+			// Set the next noteIndex to play
+			currentNoteIndex = uniqueNoteIndices[nextUniqueIndex];
+			playNextNote();
+		}, maxDuration * 1000); // Convert to milliseconds
 	}
 </script>
 
@@ -1036,6 +1182,9 @@
 		bind:playing
 		bind:reverse
 		bind:cursorPosition
+		bind:playbackPercentage
+		bind:playbackMin
+		bind:playbackMax
 	/>
 	<div class="staff-container" id="staff-container" bind:this={container}>
 		<!-- SVG container is appended here by D3 -->

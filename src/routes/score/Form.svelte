@@ -25,7 +25,10 @@
 		bpm = $bindable(),
 		playing = $bindable(),
 		reverse = $bindable(),
-		cursorPosition = $bindable()
+		cursorPosition = $bindable(),
+		playbackPercentage = $bindable(),
+		playbackMin = $bindable(),
+		playbackMax = $bindable()
 	} = $props();
 </script>
 
@@ -51,7 +54,17 @@
 		/>
 		<span class="value">{bpm}</span>
 	</div>
-
+	<div class="input-group">
+		<input
+			class="input"
+			id="playbackRange"
+			type="range"
+			min={playbackMin}
+			max={playbackMax}
+			bind:value={cursorPosition}
+			aria-label="Playback position"
+		/>
+	</div>
 	<div class="input-group">
 		<button onclick={() => (cursorPosition = 0)} aria-label="Reset to beginning"> {' |◀'} </button>
 
@@ -151,7 +164,7 @@
 			id="barCount"
 			type="range"
 			min="1"
-			max="24"
+			max="80"
 			bind:value={barCount}
 			aria-label="Number of bars"
 		/>

@@ -1,0 +1,176 @@
+[
+    {
+        "noteIndex": 0,
+        "note": "C4",
+        "duration": "quarter",
+        "rest": false
+    },
+    {
+        "noteIndex": 1,
+        "note": "D4",
+        "duration": "eighth",
+        "rest": false
+    },
+    {
+        "noteIndex": 2,
+        "note": "E4",
+        "duration": "eighth",
+        "rest": false
+    },
+    {
+        "noteIndex": 3,
+        "note": "rest",
+        "duration": "quarter",
+        "rest": true
+    },
+    {
+        "noteIndex": 4,
+        "note": "F4",
+        "duration": "half",
+        "rest": false
+    },
+    {
+        "noteIndex": 5,
+        "note": "G4",
+        "duration": "eighth",
+        "rest": false
+    },
+    {
+        "noteIndex": 6,
+        "note": "A4",
+        "duration": "quarter",
+        "rest": false
+    },
+    {
+        "noteIndex": 7,
+        "note": "rest",
+        "duration": "eighth",
+        "rest": true
+    },
+    {
+        "noteIndex": 8,
+        "note": "B4",
+        "duration": "eighth",
+        "rest": false
+    },
+    {
+        "noteIndex": 9,
+        "note": "C5",
+        "duration": "quarter",
+        "rest": false
+    },
+    {
+        "noteIndex": 10,
+        "note": "rest",
+        "duration": "eighth",
+        "rest": true
+    },
+    {
+        "noteIndex": 11,
+        "note": "A4",
+        "duration": "quarter",
+        "rest": false
+    },
+    {
+        "noteIndex": 12,
+        "note": "G4",
+        "duration": "eighth",
+        "rest": false
+    },
+    {
+        "noteIndex": 13,
+        "note": "F4",
+        "duration": "eighth",
+        "rest": false
+    },
+    {
+        "noteIndex": 14,
+        "note": "rest",
+        "duration": "quarter",
+        "rest": true
+    },
+    {
+        "noteIndex": 15,
+        "note": "E4",
+        "duration": "half",
+        "rest": false
+    },
+    {
+        "noteIndex": 16,
+        "note": "rest",
+        "duration": "quarter",
+        "rest": true
+    },
+    {
+        "noteIndex": 17,
+        "note": "D4",
+        "duration": "eighth",
+        "rest": false
+    },
+    {
+        "noteIndex": 18,
+        "note": "C4",
+        "duration": "eighth",
+        "rest": false
+    },
+    {
+        "noteIndex": 19,
+        "note": "rest",
+        "duration": "quarter",
+        "rest": true
+    },
+    {
+        "noteIndex": 20,
+        "note": "A4",
+        "duration": "quarter",
+        "rest": false
+    },
+    {
+        "noteIndex": 21,
+        "note": "B4",
+        "duration": "eighth",
+        "rest": false
+    },
+    {
+        "noteIndex": 22,
+        "note": "C5",
+        "duration": "eighth",
+        "rest": false
+    },
+    {
+        "noteIndex": 23,
+        "note": "rest",
+        "duration": "half",
+        "rest": true
+    },
+    {
+        "noteIndex": 24,
+        "note": "E5",
+        "duration": "quarter",
+        "rest": false
+    },
+    {
+        "noteIndex": 25,
+        "note": "D5",
+        "duration": "quarter",
+        "rest": false
+    },
+    {
+        "noteIndex": 26,
+        "note": "rest",
+        "duration": "quarter",
+        "rest": true
+    },
+    {
+        "noteIndex": 27,
+        "note": "C5",
+        "duration": "half",
+        "rest": false
+    },
+    {
+        "noteIndex": 28,
+        "note": "rest",
+        "duration": "quarter",
+        "rest": true
+    }
+]
