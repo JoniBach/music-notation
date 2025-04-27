@@ -343,6 +343,8 @@
 		background-color: #f0f0f0;
 		overflow-y: auto;
 		flex-shrink: 0;
+		top: 0;
+		position: sticky;
 	}
 
 	.input-group {
@@ -367,6 +369,7 @@
 		margin: 10px;
 		display: flex;
 		align-items: center;
+		overflow: hidden;
 	}
 	.symbol {
 		font-family: 'Bravura', serif;
