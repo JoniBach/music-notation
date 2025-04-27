@@ -1189,34 +1189,58 @@
 
 		// renderStaff(svg, createRenderContext());
 	}
+
+	$: showForm = typeof window !== 'undefined' ? window.innerWidth > 400 : true;
+
+	$: {
+		if (typeof showForm !== 'undefined' && showForm === showForm) {
+			// Add a small delay to allow DOM to update before resizing
+			setTimeout(() => {
+				handleResize();
+			}, 50);
+		}
+	}
 </script>
 
 <div class="score-container">
-	<Form
-		bind:barCount
-		bind:keySignature
-		bind:timeSignature
-		bind:clef
-		bind:note
-		bind:direction
-		bind:rest
-		bind:radius
-		bind:bpm
-		bind:playing
-		bind:reverse
-		bind:cursorPosition
-		bind:playbackPercentage
-		bind:playbackMin
-		bind:playbackMax
-		bind:accidental
-		{onUpload}
-	/>
+	{#if showForm}
+		<Form
+			bind:barCount
+			bind:keySignature
+			bind:timeSignature
+			bind:clef
+			bind:note
+			bind:direction
+			bind:rest
+			bind:radius
+			bind:bpm
+			bind:playing
+			bind:reverse
+			bind:cursorPosition
+			bind:playbackPercentage
+			bind:playbackMin
+			bind:playbackMax
+			bind:accidental
+			{onUpload}
+			bind:show={showForm}
+		/>
+	{/if}
 	<div class="staff-container" id="staff-container" bind:this={container}>
 		<!-- SVG container is appended here by D3 -->
+		{#if !showForm}
+			<button class="show-button" onclick={() => (showForm = true)}>Menu</button>
+		{/if}
 	</div>
 </div>
 
 <style>
+	.show-button {
+		background-color: transparent;
+		border: 1px solid #ccc;
+		padding: 5px 10px;
+		border-radius: 4px;
+		cursor: pointer;
+	}
 	.score-container {
 		display: flex;
 		width: 95%;

@@ -42,7 +42,8 @@
 		playbackMin = $bindable<number>(),
 		playbackMax = $bindable<number>(),
 		accidental = $bindable<Accidental>(),
-		onUpload = $bindable<() => void>()
+		onUpload = $bindable<() => void>(),
+		show = $bindable<boolean>()
 	} = $props();
 
 	interface ImportedNote {
@@ -90,9 +91,14 @@
 			alert('Error importing file. Please make sure it is a valid MusicXML or MXL file.');
 		}
 	}
+
+	function onHide() {
+		show = false;
+	}
 </script>
 
 <div class="sidebar">
+	<button class="show-button" onclick={onHide}>close</button>
 	<p class="headder">
 		Playback:
 
@@ -324,6 +330,13 @@
 </div>
 
 <style>
+	.show-button {
+		background-color: transparent;
+		border: 1px solid #ccc;
+		padding: 5px 10px;
+		border-radius: 4px;
+		cursor: pointer;
+	}
 	.sidebar {
 		width: 200px;
 		height: 100vh;
