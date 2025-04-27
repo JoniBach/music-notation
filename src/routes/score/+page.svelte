@@ -17,7 +17,7 @@
 		ACCIDENTAL
 	} from './config';
 	import { createFeatures, calculateStaffPosition, getNotePosition } from './features';
-	import example_piece from './examples/4.json';
+	import example_piece from './examples/6.json';
 
 	let keySignature = 'c_major_a_minor';
 	let timeSignature = '4_4_common_time';
