@@ -1190,6 +1190,11 @@
 		// renderStaff(svg, createRenderContext());
 	}
 
+	function onClear() {
+		scoreNotes = [];
+		renderStaff(svg, createRenderContext());
+	}
+
 	$: showForm = typeof window !== 'undefined' ? window.innerWidth > 400 : true;
 
 	$: {
@@ -1223,6 +1228,7 @@
 			bind:accidental
 			{onUpload}
 			bind:show={showForm}
+			{onClear}
 		/>
 	{/if}
 	<div class="staff-container" id="staff-container" bind:this={container}>

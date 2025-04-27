@@ -43,7 +43,8 @@
 		playbackMax = $bindable<number>(),
 		accidental = $bindable<Accidental>(),
 		onUpload = $bindable<() => void>(),
-		show = $bindable<boolean>()
+		show = $bindable<boolean>(),
+		onClear = $bindable<() => void>()
 	} = $props();
 
 	interface ImportedNote {
@@ -315,16 +316,20 @@
 	</div>
 
 	<hr />
-	<p class="headder">Import Score</p>
+	<p class="headder">File</p>
 	<div class="input-group">
-		<label for="xmlFileInput" class="label">Import MusicXML</label>
+		<button onclick={onClear}>Clear Score</button>
+
+		<button class="file-button" onclick={() => fileInput.click()} aria-label="Import MusicXML file">
+			Upload MusicXML/MXL
+		</button>
 		<input
 			id="xmlFileInput"
 			type="file"
 			accept=".xml,.musicxml,.mxl"
 			onchange={handleFileImport}
 			bind:this={fileInput}
-			aria-label="Import MusicXML file"
+			style="display: none;"
 		/>
 	</div>
 </div>
@@ -336,6 +341,7 @@
 		padding: 5px 10px;
 		border-radius: 4px;
 		cursor: pointer;
+		width: 100%;
 	}
 	.sidebar {
 		width: 200px;
