@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import {
 		KEY_SIGNATURE_IDS,
 		KEY_SIGNATURE,
@@ -13,25 +13,83 @@
 		ACCIDENTAL,
 		ACCIDENTAL_IDS
 	} from './config';
+	import { musicXMLtoJson, handleMxlContent } from '../xml-to-json/xmlToJson';
+	import { createEventDispatcher } from 'svelte';
+
+	type KeySignature = keyof typeof KEY_SIGNATURE;
+	type TimeSignature = keyof typeof TIME_SIGNATURE;
+	type Clef = keyof typeof CLEF;
+	type Note = keyof typeof NOTE.down;
+	type Direction = keyof typeof NOTE;
+	type Accidental = keyof typeof ACCIDENTAL;
+
+	const dispatch = createEventDispatcher();
 
 	let {
-		keySignature = $bindable(),
-		timeSignature = $bindable(),
-		clef = $bindable(),
-		note = $bindable(),
-		direction = $bindable(),
-		rest = $bindable(),
-		barCount = $bindable(),
-		radius = $bindable(),
-		bpm = $bindable(),
-		playing = $bindable(),
-		reverse = $bindable(),
-		cursorPosition = $bindable(),
-		playbackPercentage = $bindable(),
-		playbackMin = $bindable(),
-		playbackMax = $bindable(),
-		accidental = $bindable()
+		keySignature = $bindable<KeySignature>(),
+		timeSignature = $bindable<TimeSignature>(),
+		clef = $bindable<Clef>(),
+		note = $bindable<Note>(),
+		direction = $bindable<Direction>(),
+		rest = $bindable<boolean>(),
+		barCount = $bindable<number>(),
+		radius = $bindable<number>(),
+		bpm = $bindable<number>(),
+		playing = $bindable<boolean>(),
+		reverse = $bindable<boolean>(),
+		cursorPosition = $bindable<number>(),
+		playbackPercentage = $bindable<number>(),
+		playbackMin = $bindable<number>(),
+		playbackMax = $bindable<number>(),
+		accidental = $bindable<Accidental>(),
+		onUpload = $bindable<() => void>()
 	} = $props();
+
+	interface ImportedNote {
+		noteIndex: number;
+		note: string;
+		duration: string;
+		rest: boolean;
+	}
+
+	let importedNotes: ImportedNote[] = [];
+	let fileInput: HTMLInputElement;
+
+	// Type assertions for config objects
+	const typedClef = CLEF as Record<Clef, { code: string }>;
+	const typedKeySignature = KEY_SIGNATURE as Record<
+		KeySignature,
+		{ sharps: number; flats: number }
+	>;
+	const typedTimeSignature = TIME_SIGNATURE as Record<
+		TimeSignature,
+		{ numeratorCode: string; denominatorCode: string }
+	>;
+	const typedNote = NOTE as Record<Direction, Record<Note, { code: string }>>;
+	const typedRest = REST as Record<Note, { code: string }>;
+	const typedAccidental = ACCIDENTAL as Record<Accidental, string>;
+
+	async function handleFileImport(event: Event) {
+		const target = event.target as HTMLInputElement;
+		const file = target?.files?.[0];
+		if (!file) return;
+
+		try {
+			let xmlContent: string;
+			if (file.name.endsWith('.mxl')) {
+				const buffer = await file.arrayBuffer();
+				xmlContent = await handleMxlContent(buffer);
+			} else {
+				xmlContent = await file.text();
+			}
+
+			importedNotes = musicXMLtoJson(xmlContent);
+			onUpload?.(importedNotes);
+		} catch (error) {
+			console.error('Error importing file:', error);
+			alert('Error importing file. Please make sure it is a valid MusicXML or MXL file.');
+		}
+	}
 </script>
 
 <div class="sidebar">
@@ -89,19 +147,19 @@
 	<p class="headder">
 		Score
 		<span class="clef">
-			{@html String.fromCodePoint(parseInt(CLEF[clef].code.replace('U+', ''), 16))}
+			{@html String.fromCodePoint(parseInt(typedClef[clef].code.replace('U+', ''), 16))}
 		</span>
 		<span class="symbol">
-			{#if KEY_SIGNATURE[keySignature]?.sharps > 0}
-				{#each Array(KEY_SIGNATURE[keySignature].sharps) as _, i}
-					{@html String.fromCodePoint(parseInt(ACCIDENTAL.sharp.replace('U+', ''), 16))}
+			{#if typedKeySignature[keySignature]?.sharps > 0}
+				{#each Array(typedKeySignature[keySignature].sharps) as _, i}
+					{@html String.fromCodePoint(parseInt(typedAccidental.sharp.replace('U+', ''), 16))}
 				{/each}
-			{:else if KEY_SIGNATURE[keySignature]?.flats > 0}
-				{#each Array(KEY_SIGNATURE[keySignature].flats) as _, i}
-					{@html String.fromCodePoint(parseInt(ACCIDENTAL.flat.replace('U+', ''), 16))}
+			{:else if typedKeySignature[keySignature]?.flats > 0}
+				{#each Array(typedKeySignature[keySignature].flats) as _, i}
+					{@html String.fromCodePoint(parseInt(typedAccidental.flat.replace('U+', ''), 16))}
 				{/each}
 			{:else}
-				{@html String.fromCodePoint(parseInt(ACCIDENTAL.natural.replace('U+', ''), 16))}
+				{@html String.fromCodePoint(parseInt(typedAccidental.natural.replace('U+', ''), 16))}
 			{/if}
 		</span>
 		<span class="time-symbol">
@@ -113,12 +171,12 @@
 				<span class="time-signature-stack">
 					<span class="numerator">
 						{@html String.fromCodePoint(
-							parseInt(TIME_SIGNATURE[timeSignature].numeratorCode.replace('U+', ''), 16)
+							parseInt(typedTimeSignature[timeSignature].numeratorCode.replace('U+', ''), 16)
 						)}
 					</span>
 					<span class="denominator">
 						{@html String.fromCodePoint(
-							parseInt(TIME_SIGNATURE[timeSignature].denominatorCode.replace('U+', ''), 16)
+							parseInt(typedTimeSignature[timeSignature].denominatorCode.replace('U+', ''), 16)
 						)}
 					</span>
 				</span>
@@ -191,12 +249,14 @@
 		Tool <span class="symbol">
 			{@html String.fromCodePoint(
 				parseInt(
-					rest ? REST[note].code.replace('U+', '') : NOTE[direction][note].code.replace('U+', ''),
+					rest
+						? typedRest[note].code.replace('U+', '')
+						: typedNote[direction][note].code.replace('U+', ''),
 					16
 				)
 			)}
 
-			{@html String.fromCodePoint(parseInt(ACCIDENTAL[accidental].replace('U+', ''), 16))}
+			{@html String.fromCodePoint(parseInt(typedAccidental[accidental].replace('U+', ''), 16))}
 		</span>
 	</p>
 
@@ -246,6 +306,20 @@
 				<option value={id}>{id}</option>
 			{/each}
 		</select>
+	</div>
+
+	<hr />
+	<p class="headder">Import Score</p>
+	<div class="input-group">
+		<label for="xmlFileInput" class="label">Import MusicXML</label>
+		<input
+			id="xmlFileInput"
+			type="file"
+			accept=".xml,.musicxml,.mxl"
+			onchange={handleFileImport}
+			bind:this={fileInput}
+			aria-label="Import MusicXML file"
+		/>
 	</div>
 </div>
 

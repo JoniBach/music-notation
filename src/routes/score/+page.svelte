@@ -1180,6 +1180,15 @@
 			playNextNote();
 		}, maxDuration * 1000); // Convert to milliseconds
 	}
+	function onUpload(notes) {
+		scoreNotes = notes;
+		console.log({ notes });
+
+		scoreNotes = notes;
+		renderStaff(svg, createRenderContext());
+
+		// renderStaff(svg, createRenderContext());
+	}
 </script>
 
 <div class="score-container">
@@ -1200,6 +1209,7 @@
 		bind:playbackMin
 		bind:playbackMax
 		bind:accidental
+		{onUpload}
 	/>
 	<div class="staff-container" id="staff-container" bind:this={container}>
 		<!-- SVG container is appended here by D3 -->
