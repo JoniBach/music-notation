@@ -269,6 +269,8 @@ export const createFeatures = (
 		noteGroup
 			.append('text')
 			.attr('class', 'smuFL-symbol')
+			.attr('fill', noteData.origin === 'ai' ? 'purple' : 'black')
+
 			.attr('text-anchor', 'middle')
 			.style('font-size', `${scaledFontSize}px`)
 			.text(noteSymbol);

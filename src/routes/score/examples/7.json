@@ -1,0 +1,80 @@
+[
+  {
+    "noteIndex": 0,
+    "note": "F4",
+    "duration": "quarter",
+    "rest": false
+  },
+  {
+    "noteIndex": 1,
+    "note": "F4",
+    "duration": "quarter",
+    "rest": false
+  },
+  {
+    "noteIndex": 2,
+    "note": "F4",
+    "duration": "quarter",
+    "rest": false
+  },
+  {
+    "noteIndex": 3,
+    "note": "G4",
+    "duration": "quarter",
+    "rest": false
+  },
+  {
+    "noteIndex": 4,
+    "note": "F4",
+    "duration": "quarter",
+    "rest": false
+  },
+  {
+    "noteIndex": 5,
+    "note": "F4",
+    "duration": "quarter",
+    "rest": false
+  },
+  {
+    "noteIndex": 6,
+    "note": "C4",
+    "duration": "half",
+    "rest": false
+  },
+  {
+    "noteIndex": 7,
+    "note": "D4",
+    "duration": "quarter",
+    "rest": false
+  },
+  {
+    "noteIndex": 8,
+    "note": "C4",
+    "duration": "quarter",
+    "rest": false
+  },
+  {
+    "noteIndex": 9,
+    "note": "D4",
+    "duration": "quarter",
+    "rest": false
+  },
+  {
+    "noteIndex": 10,
+    "note": "E4",
+    "duration": "quarter",
+    "rest": false
+  },
+  {
+    "noteIndex": 11,
+    "note": "F4",
+    "duration": "half",
+    "rest": false
+  },
+  {
+    "noteIndex": 12,
+    "note": "F4",
+    "duration": "half",
+    "rest": false
+  }
+]

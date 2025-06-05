@@ -17,7 +17,11 @@
 		ACCIDENTAL
 	} from './config';
 	import { createFeatures, calculateStaffPosition, getNotePosition } from './features';
-	import example_piece from './examples/6.json';
+	import example_piece from './examples/7.json';
+	export let data;
+	export let form;
+
+	$: console.log(data);
 
 	let keySignature = 'c_major_a_minor';
 	let timeSignature = '4_4_common_time';
@@ -1205,6 +1209,25 @@
 			}, 50);
 		}
 	}
+
+	function onAccept() {
+		const userNotes = scoreNotes.map((note) => ({
+			...note,
+			origin: 'user'
+		}));
+
+		scoreNotes = addMultipleNotes(userNotes, []);
+		renderStaff(svg, createRenderContext());
+	}
+
+	function onReject() {
+		const userNotes = scoreNotes.filter((note) => note.origin !== 'ai');
+
+		scoreNotes = addMultipleNotes(userNotes, []);
+		renderStaff(svg, createRenderContext());
+	}
+
+	$: console.log(form);
 </script>
 
 <div class="score-container">
@@ -1226,13 +1249,20 @@
 			bind:playbackMin
 			bind:playbackMax
 			bind:accidental
-			{onUpload}
 			bind:show={showForm}
+			bind:scoreNotes
+			{onUpload}
 			{onClear}
+			{onAccept}
+			{onReject}
 		/>
 	{/if}
 	<div class="staff-container" id="staff-container" bind:this={container}>
 		<!-- SVG container is appended here by D3 -->
+		{#if form?.result}
+			<p>{form.prompt}</p>
+			<p>{form.result}</p>
+		{/if}
 		{#if !showForm}
 			<button class="show-button" onclick={() => (showForm = true)}>Menu</button>
 		{/if}

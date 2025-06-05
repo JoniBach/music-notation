@@ -15,6 +15,7 @@
 	} from './config';
 	import { musicXMLtoJson, handleMxlContent } from '../xml-to-json/xmlToJson';
 	import { createEventDispatcher } from 'svelte';
+	import { enhance } from '$app/forms';
 
 	type KeySignature = keyof typeof KEY_SIGNATURE;
 	type TimeSignature = keyof typeof TIME_SIGNATURE;
@@ -44,7 +45,10 @@
 		accidental = $bindable<Accidental>(),
 		onUpload = $bindable<() => void>(),
 		show = $bindable<boolean>(),
-		onClear = $bindable<() => void>()
+		onClear = $bindable<() => void>(),
+		scoreNotes = $bindable<Array<Note>>(),
+		onAccept = $bindable<() => void>(),
+		onReject = $bindable<() => void>()
 	} = $props();
 
 	interface ImportedNote {
@@ -331,6 +335,65 @@
 			bind:this={fileInput}
 			style="display: none;"
 		/>
+	</div>
+	<!-- 
+	<form
+		method="POST"
+		action="?/prompt"
+		use:enhance={({ formElement, formData, action, cancel, submitter }) => {
+			// `formElement` is this `<form>` element
+			// `formData` is its `FormData` object that's about to be submitted
+			// `action` is the URL to which the form is posted
+			// calling `cancel()` will prevent the submission
+			// `submitter` is the `HTMLElement` that caused the form to be submitted
+
+			return async ({ result, update }) => {
+				console.log(result);
+				update(result);
+				// `result` is an `ActionResult` object
+				// `update` is a function which triggers the default logic
+				// that would be triggered if this callback wasn't set
+			};
+		}}
+	>
+		<input name="prompt" />
+		<button type="submit">Submit</button>
+	</form> -->
+
+	<div class="input-group">
+		<form
+			method="POST"
+			action="?/suggest"
+			use:enhance={({ formElement, formData, action, cancel, submitter }) => {
+				// `formElement` is this `<form>` element
+				// `formData` is its `FormData` object that's about to be submitted
+				// `action` is the URL to which the form is posted
+				// calling `cancel()` will prevent the submission
+				// `submitter` is the `HTMLElement` that caused the form to be submitted
+				// console.log(scoreNotes);
+				formData.append('score', JSON.stringify(scoreNotes));
+
+				return async ({ result, update }) => {
+					if (result?.data?.sugestion) {
+						const req = result.data.score;
+						const res = result.data.sugestion;
+
+						console.log('req - ', req);
+						console.log('res - ', res);
+						onUpload?.([...req, ...res]);
+					}
+					update(result);
+					// `result` is an `ActionResult` object
+					// `update` is a function which triggers the default logic
+					// that would be triggered if this callback wasn't set
+				};
+			}}
+		>
+			<input class="input" name="prompt" placeholder="Describe what to add..." />
+			<button class="file-button" type="submit">Generate</button>
+			<button class="file-button" type="button" onclick={onAccept}>Accept</button>
+			<button class="file-button" type="button" onclick={onReject}>Reject</button>
+		</form>
 	</div>
 </div>
 
